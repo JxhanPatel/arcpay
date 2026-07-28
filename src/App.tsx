@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
 import { Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { filterNonZeroAssetBalances, formatTokenBalance } from './balance';
 
 const STORAGE_KEY = 'arc_wallet_pk';
 const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
@@ -9,6 +10,7 @@ const ARC_CHAIN_ID = 5042002;
 const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
 const EXPLORER_URL = 'https://explorer.testnet.arc.network';
+const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
 
 const isValidPrivateKey = (input: string) => {
   const normalized = input.trim();
@@ -48,6 +50,8 @@ function App() {
   const [txState, setTxState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [assetBalances, setAssetBalances] = useState([{ key: 'usdc', symbol: 'USDC', balance }]);
+  const [tokenAssets, setTokenAssets] = useState<Array<{ key: string; symbol: string; balance: string }>>([]);
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
@@ -73,8 +77,38 @@ function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const value = await provider.getBalance(targetWallet.address);
-      setBalance(ethers.formatEther(value));
+      const address = targetWallet.address;
+      const explorerResponse = await fetch(`${ARC_EXPLORER_API_URL}/addresses/${address}/token-balances`);
+      if (!explorerResponse.ok) {
+        throw new Error('Unable to fetch token balances from Arc explorer.');
+      }
+      const tokens = (await explorerResponse.json()) as Array<{
+        token?: { symbol?: string; name?: string; decimals?: string; address_hash?: string };
+        value?: string;
+      }>;
+
+      const normalizedAssets = tokens
+        .filter((token) => token.token?.symbol && token.value)
+        .map((token) => {
+          const decimals = Number(token.token?.decimals ?? 18);
+          const normalizedBalance = formatTokenBalance(BigInt(token.value ?? '0'), Number.isFinite(decimals) ? decimals : 18);
+          const symbol = token.token?.symbol ?? 'TOKEN';
+          return {
+            key: token.token?.address_hash ?? symbol,
+            symbol,
+            balance: normalizedBalance,
+          };
+        })
+        .filter((asset) => Number(asset.balance) > 0);
+
+      const usdcAsset = normalizedAssets.find((asset) => asset.symbol === 'USDC');
+      if (usdcAsset) {
+        setBalance(usdcAsset.balance);
+      } else {
+        setBalance('0');
+      }
+      setTokenAssets(normalizedAssets);
+      setAssetBalances(normalizedAssets.length > 0 ? normalizedAssets : [{ key: 'usdc', symbol: 'USDC', balance: usdcAsset?.balance ?? '0' }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to fetch balance.');
     } finally {
@@ -162,6 +196,11 @@ function App() {
   };
 
   const address = wallet?.address ?? '';
+  const visibleAssets = useMemo(() => filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances), [assetBalances, tokenAssets]);
+
+  useEffect(() => {
+    setAssetBalances((current) => current.map((asset) => (asset.key === 'usdc' ? { ...asset, balance } : asset)));
+  }, [balance]);
 
   if (!wallet) {
     return (
@@ -243,39 +282,60 @@ function App() {
         </header>
 
         <section className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 shadow-[0_0_80px_rgba(0,0,0,0.3)] backdrop-blur-md sm:p-8">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Wallet balance</p>
-              <h2 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">{Number(balance).toFixed(4)} {ARC_CURRENCY_SYMBOL}</h2>
+              <h2 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">{balance} {ARC_CURRENCY_SYMBOL}</h2>
               <p className="mt-2 text-sm text-[#A1A1AA]">{ARC_NETWORK_NAME} · Chain ID {ARC_CHAIN_ID}</p>
             </div>
-            <button onClick={() => void refreshBalance()} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <RefreshCcw className="h-4 w-4" />
-              Refresh balance
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button onClick={() => setShowSend(true)} className="flex items-center gap-2 rounded-full bg-[#3B82F6] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2563EB]">
+                <Send className="h-4 w-4" />
+                Send
+              </button>
+              <button onClick={() => setShowReceive(true)} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+                <Download className="h-4 w-4" />
+                Receive
+              </button>
+              <button onClick={() => void refreshBalance()} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA] transition hover:border-[#3B82F6]">
+                <RefreshCcw className="h-4 w-4" />
+                Refresh balance
+              </button>
+            </div>
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 backdrop-blur-md">
+          <div className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 backdrop-blur-md lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Actions</p>
-                <h3 className="text-xl font-semibold tracking-tight">Move funds</h3>
+                <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Coin list</p>
               </div>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button onClick={() => setShowSend(true)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB]">
-                <Send className="h-4 w-4" />
-                Send
-              </button>
-              <button onClick={() => setShowReceive(true)} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#27272A] bg-[#161616] px-4 py-3 font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-                <Download className="h-4 w-4" />
-                Receive
-              </button>
-            </div>
+            {visibleAssets.length > 0 ? (
+              <div className="divide-y divide-[#27272A] rounded-2xl border border-[#27272A] bg-[#161616]">
+                {visibleAssets.map((asset) => (
+                  <div key={asset.key} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-sm font-semibold text-[#93C5FD]">
+                        {asset.symbol.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-[#FAFAFA]">{asset.symbol}</p>
+                        <p className="text-sm text-[#A1A1AA]">Active balance</p>
+                      </div>
+                    </div>
+                    <p className="text-lg font-semibold text-[#FAFAFA]">{asset.balance}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#A1A1AA]">No balances above zero yet.</p>
+            )}
           </div>
+        </section>
 
+        <section className="grid gap-6 lg:grid-cols-1">
           <div className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 backdrop-blur-md">
             <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Address</p>
             <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
