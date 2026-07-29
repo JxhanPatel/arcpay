@@ -9,7 +9,7 @@ const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
 const ARC_CHAIN_ID = 5042002;
 const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
-const EXPLORER_URL = 'https://explorer.testnet.arc.network';
+const EXPLORER_URL = 'https://testnet.arcscan.app';
 const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
 
 const isValidPrivateKey = (input: string) => {
@@ -59,7 +59,7 @@ function App() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
-        const parsed = new ethers.Wallet(stored);
+        const parsed = new ethers.Wallet(stored, provider);
         setPrivateKey(stored);
         setWallet(parsed);
         void refreshBalance(parsed);
@@ -69,7 +69,7 @@ function App() {
         setWallet(null);
       }
     }
-  }, []);
+  }, [provider]);
 
   const refreshBalance = async (currentWallet?: ArcWallet | null) => {
     const targetWallet = currentWallet ?? wallet;
@@ -120,7 +120,7 @@ function App() {
     try {
       setIsLoading(true);
       setError(null);
-      const created = ethers.Wallet.createRandom();
+      const created = ethers.Wallet.createRandom().connect(provider);
       const privateKeyValue = created.privateKey;
       localStorage.setItem(STORAGE_KEY, privateKeyValue);
       setPrivateKey(privateKeyValue);
@@ -141,7 +141,7 @@ function App() {
       if (!isValidPrivateKey(importInput)) {
         throw new Error('Enter a valid 12-word seed phrase or a raw private key.');
       }
-      const imported = parseWalletInput(importInput);
+      const imported = parseWalletInput(importInput).connect(provider);
       const privateKeyValue = imported.privateKey;
       localStorage.setItem(STORAGE_KEY, privateKeyValue);
       setPrivateKey(privateKeyValue);
