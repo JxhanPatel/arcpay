@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
-import { Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { filterNonZeroAssetBalances, formatTokenBalance } from './balance';
+import { filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
 
 const STORAGE_KEY = 'arc_wallet_pk';
 const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
@@ -11,6 +11,10 @@ const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
 const EXPLORER_URL = 'https://testnet.arcscan.app';
 const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
+const ASSET_ICON_URLS: Record<string, string> = {
+  USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+  EURC: 'https://orbmarkets.io/api/icons/euroCoin.png',
+};
 
 const isValidPrivateKey = (input: string) => {
   const normalized = input.trim();
@@ -52,6 +56,7 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [assetBalances, setAssetBalances] = useState([{ key: 'usdc', symbol: 'USDC', balance }]);
   const [tokenAssets, setTokenAssets] = useState<Array<{ key: string; symbol: string; balance: string }>>([]);
+  const [showAssetBreakdown, setShowAssetBreakdown] = useState(false);
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
@@ -196,7 +201,18 @@ function App() {
   };
 
   const address = wallet?.address ?? '';
-  const visibleAssets = useMemo(() => filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances), [assetBalances, tokenAssets]);
+  const visibleAssets = useMemo(() => {
+    const rawAssets = filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances);
+    return rawAssets.map((asset) => ({ ...asset, balance: formatDisplayBalance(asset.balance) }));
+  }, [assetBalances, tokenAssets]);
+  const totalPortfolioValue = useMemo(() => {
+    return formatDisplayBalance(
+      visibleAssets.reduce((total, asset) => {
+        const numericBalance = Number.parseFloat(asset.balance.replace(/,/g, ''));
+        return total + (Number.isFinite(numericBalance) ? numericBalance : 0);
+      }, 0),
+    );
+  }, [visibleAssets]);
 
   useEffect(() => {
     setAssetBalances((current) => current.map((asset) => (asset.key === 'usdc' ? { ...asset, balance } : asset)));
@@ -261,92 +277,137 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] px-4 py-5 sm:px-6 lg:px-8">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
       </div>
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-6">
-        <header className="flex items-center justify-between rounded-2xl border border-[#27272A] bg-[#121212]/80 px-4 py-4 backdrop-blur-md sm:px-6">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.35em] text-[#A1A1AA]">Arc Network</p>
-            <h1 className="text-xl font-semibold tracking-tight">ArcPay</h1>
+      <div className="relative mx-auto flex max-w-md flex-col gap-4">
+        <header className="flex items-center justify-between border-b border-[#27272A] pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1F4ED8]/20 text-[#93C5FD]">
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Arc Network</p>
+              <h1 className="text-lg font-semibold tracking-tight">ArcPay</h1>
+            </div>
           </div>
+
           <div className="flex items-center gap-2">
-            <button onClick={copyAddress} className="rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-sm text-[#FAFAFA]">
-              {address.slice(0, 6)}...{address.slice(-4)}
+            <button
+              onClick={copyAddress}
+              className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]"
+              aria-label="Copy wallet address"
+            >
+              <span className="font-mono">{address.slice(0, 6)}...{address.slice(-4)}</span>
+              <Copy className="h-3.5 w-3.5 text-[#A1A1AA]" />
             </button>
-            <button onClick={handleLock} className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]" aria-label="Lock wallet">
+            <button
+              onClick={handleLock}
+              className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]"
+              aria-label="Lock wallet"
+            >
               <Lock className="h-4 w-4" />
             </button>
           </div>
         </header>
 
-        <section className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 shadow-[0_0_80px_rgba(0,0,0,0.3)] backdrop-blur-md sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Wallet balance</p>
-              <h2 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">{balance} {ARC_CURRENCY_SYMBOL}</h2>
-              <p className="mt-2 text-sm text-[#A1A1AA]">{ARC_NETWORK_NAME} · Chain ID {ARC_CHAIN_ID}</p>
+              <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Portfolio value</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight">${totalPortfolioValue} <span className="text-base font-medium text-[#A1A1AA]">USD</span></h2>
+              <p className="mt-2 text-xs text-[#A1A1AA]">{ARC_NETWORK_NAME} · Chain ID {ARC_CHAIN_ID}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button onClick={() => setShowSend(true)} className="flex items-center gap-2 rounded-full bg-[#3B82F6] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2563EB]">
-                <Send className="h-4 w-4" />
-                Send
-              </button>
-              <button onClick={() => setShowReceive(true)} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-                <Download className="h-4 w-4" />
-                Receive
-              </button>
-              <button onClick={() => void refreshBalance()} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA] transition hover:border-[#3B82F6]">
-                <RefreshCcw className="h-4 w-4" />
-                Refresh balance
-              </button>
+            <button
+              onClick={() => setShowAssetBreakdown((current) => !current)}
+              className="flex items-center gap-1 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-[11px] text-[#FAFAFA]"
+            >
+              {showAssetBreakdown ? 'Hide' : 'Assets'}
+              {showAssetBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {showAssetBreakdown ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {visibleAssets.map((asset) => (
+                <button
+                  key={asset.key}
+                  className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]"
+                >
+                  <img
+                    src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
+                    alt={`${asset.symbol} icon`}
+                    className="h-5 w-5 rounded-full"
+                    onError={(event) => {
+                      event.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <span>{asset.symbol}</span>
+                  <span className="text-[#A1A1AA]">{asset.balance}</span>
+                </button>
+              ))}
             </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+          <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
+            <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Wallet actions</p>
+            <button onClick={() => void refreshBalance()} className="flex items-center gap-1 text-xs text-[#A1A1AA]">
+              <RefreshCcw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setShowSend(true)} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
+              <Send className="h-4 w-4" />
+              Send
+            </button>
+            <button onClick={() => setShowReceive(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <Download className="h-4 w-4" />
+              Receive
+            </button>
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 backdrop-blur-md lg:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Coin list</p>
-              </div>
-            </div>
-            {visibleAssets.length > 0 ? (
-              <div className="divide-y divide-[#27272A] rounded-2xl border border-[#27272A] bg-[#161616]">
-                {visibleAssets.map((asset) => (
-                  <div key={asset.key} className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-sm font-semibold text-[#93C5FD]">
-                        {asset.symbol.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-[#FAFAFA]">{asset.symbol}</p>
-                        <p className="text-sm text-[#A1A1AA]">Active balance</p>
-                      </div>
+        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+          <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
+            <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Holdings</p>
+            <span className="text-[11px] text-[#A1A1AA]">{visibleAssets.length} assets</span>
+          </div>
+          {visibleAssets.length > 0 ? (
+            <div className="space-y-3">
+              {visibleAssets.map((asset) => (
+                <div key={asset.key} className="flex items-center justify-between gap-3 border-b border-[#27272A] pb-3 last:border-b-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
+                      alt={`${asset.symbol} icon`}
+                      className="h-9 w-9 rounded-full"
+                      onError={(event) => {
+                        event.currentTarget.style.display = 'none';
+                        const fallback = document.createElement('div');
+                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-[11px] font-semibold text-[#93C5FD]';
+                        fallback.textContent = asset.symbol.slice(0, 2).toUpperCase();
+                        event.currentTarget.parentElement?.appendChild(fallback);
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-[#FAFAFA]">{asset.symbol}</p>
+                      <p className="text-xs text-[#A1A1AA]">Available balance</p>
                     </div>
-                    <p className="text-lg font-semibold text-[#FAFAFA]">{asset.balance}</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[#A1A1AA]">No balances above zero yet.</p>
-            )}
-          </div>
+                  <p className="text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-[#A1A1AA]">No balances above zero yet.</p>
+          )}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-1">
-          <div className="rounded-3xl border border-[#27272A] bg-[#121212]/80 p-6 backdrop-blur-md">
-            <p className="text-[11px] uppercase tracking-[0.35em] text-[#A1A1AA]">Address</p>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
-              <p className="truncate font-mono text-sm">{address}</p>
-              <button onClick={copyAddress} className="shrink-0 rounded-full border border-[#27272A] p-2 text-[#A1A1AA]">
-                <Copy className="h-4 w-4" />
-              </button>
-            </div>
-            {copied ? <p className="mt-2 text-sm text-[#3B82F6]">Address copied</p> : null}
-          </div>
-        </section>
+        {copied ? <p className="text-center text-xs text-[#3B82F6]">Address copied</p> : null}
       </div>
 
       {showReceive ? (

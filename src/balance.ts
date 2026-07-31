@@ -17,6 +17,18 @@ export const formatTokenBalance = (rawBalance: bigint, decimals: number) => {
   return `${whole}.${fractionString}`;
 };
 
+export const formatDisplayBalance = (balance: string | number) => {
+  const numericValue = Number.parseFloat(String(balance));
+  if (!Number.isFinite(numericValue)) {
+    return '0.00';
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericValue);
+};
+
 export const filterNonZeroAssetBalances = (assets: AssetBalance[]) => {
   return assets.filter((asset) => {
     const normalized = Number(asset.balance);

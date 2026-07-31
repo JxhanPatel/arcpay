@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { filterNonZeroAssetBalances, formatTokenBalance } from './balance';
+import { filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
 
 describe('formatTokenBalance', () => {
   it('formats USDC balances from raw token units', () => {
     expect(formatTokenBalance(20_000_000n, 6)).toBe('20');
     expect(formatTokenBalance(1_234_567n, 6)).toBe('1.234567');
+  });
+});
+
+describe('formatDisplayBalance', () => {
+  it('rounds balances to two visible decimals for mobile display', () => {
+    expect(formatDisplayBalance('18.901234')).toBe('18.90');
+    expect(formatDisplayBalance('20')).toBe('20.00');
+    expect(formatDisplayBalance('0')).toBe('0.00');
   });
 });
 
