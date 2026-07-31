@@ -2,6 +2,7 @@ export type AssetBalance = {
   key: string;
   symbol: string;
   balance: string;
+  decimals?: number;
 };
 
 export const formatTokenBalance = (rawBalance: bigint, decimals: number) => {

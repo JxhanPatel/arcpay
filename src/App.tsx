@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import { ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
+import { resolveArcName } from './utils/arcName';
 
 const STORAGE_KEY = 'arc_wallet_pk';
 const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
@@ -51,12 +52,20 @@ function App() {
   const [showSend, setShowSend] = useState(false);
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
+  const [sendAssetKey, setSendAssetKey] = useState('usdc');
+  const [sendReview, setSendReview] = useState(false);
+  const [sendRecipientError, setSendRecipientError] = useState('');
+  const [sendAmountError, setSendAmountError] = useState('');
   const [txState, setTxState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [assetBalances, setAssetBalances] = useState([{ key: 'usdc', symbol: 'USDC', balance }]);
-  const [tokenAssets, setTokenAssets] = useState<Array<{ key: string; symbol: string; balance: string }>>([]);
+  const [assetBalances, setAssetBalances] = useState<Array<{ key: string; symbol: string; balance: string; decimals: number }>>([
+    { key: 'usdc', symbol: 'USDC', balance, decimals: 6 },
+  ]);
+  const [tokenAssets, setTokenAssets] = useState<Array<{ key: string; symbol: string; balance: string; decimals: number }>>([]);
   const [showAssetBreakdown, setShowAssetBreakdown] = useState(false);
+  const [resolvedSendAddress, setResolvedSendAddress] = useState<string | null>(null);
+  const [isResolvingArcName, setIsResolvingArcName] = useState(false);
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
@@ -102,6 +111,7 @@ function App() {
             key: token.token?.address_hash ?? symbol,
             symbol,
             balance: normalizedBalance,
+            decimals: Number.isFinite(decimals) ? decimals : 18,
           };
         })
         .filter((asset) => Number(asset.balance) > 0);
@@ -113,7 +123,11 @@ function App() {
         setBalance('0');
       }
       setTokenAssets(normalizedAssets);
-      setAssetBalances(normalizedAssets.length > 0 ? normalizedAssets : [{ key: 'usdc', symbol: 'USDC', balance: usdcAsset?.balance ?? '0' }]);
+      setAssetBalances(
+        normalizedAssets.length > 0
+          ? normalizedAssets
+          : [{ key: 'usdc', symbol: 'USDC', balance: usdcAsset?.balance ?? '0', decimals: 6 }],
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to fetch balance.');
     } finally {
@@ -172,6 +186,28 @@ function App() {
     setTxState('idle');
   };
 
+  const openSendModal = () => {
+    const defaultAsset = [
+      ...tokenAssets,
+      ...assetBalances,
+    ].find((asset) => asset.symbol === 'USDC') ?? [
+      ...tokenAssets,
+      ...assetBalances,
+    ].find((asset) => Number(asset.balance) > 0) ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+
+    setSendAssetKey(defaultAsset.key);
+    setSendAddress('');
+    setSendAmount('');
+    setSendReview(false);
+    setSendRecipientError('');
+    setSendAmountError('');
+    setResolvedSendAddress(null);
+    setIsResolvingArcName(false);
+    setTxState('idle');
+    setTxHash(null);
+    setShowSend(true);
+  };
+
   const copyAddress = async () => {
     if (!wallet?.address) return;
     await navigator.clipboard.writeText(wallet.address);
@@ -179,21 +215,147 @@ function App() {
     window.setTimeout(() => setCopied(false), 1300);
   };
 
+  const sendAssets = useMemo(() => {
+    return filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances);
+  }, [assetBalances, tokenAssets]);
+
+  const selectedSendAsset = useMemo(() => {
+    return sendAssets.find((asset) => asset.key === sendAssetKey)
+      ?? sendAssets.find((asset) => asset.symbol === 'USDC')
+      ?? sendAssets[0]
+      ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+  }, [sendAssetKey, sendAssets]);
+
+  const selectedSendAssetDecimals = selectedSendAsset.decimals ?? 6;
+
+  const resolveRecipientAddress = async (value: string) => {
+    const input = String(value).trim();
+    if (!input) {
+      throw new Error('Enter a recipient address or ArcName handle.');
+    }
+
+    const looksLikeAddress = /^0x[a-fA-F0-9]{40}$/.test(input);
+    if (looksLikeAddress) {
+      const checksum = ethers.getAddress(input);
+      setResolvedSendAddress(checksum);
+      setIsResolvingArcName(false);
+      return checksum;
+    }
+
+    const normalizedLower = input.toLowerCase();
+    if (!normalizedLower.endsWith('.arc')) {
+      throw new Error('Enter a valid checksummed address or a handle ending in .arc.');
+    }
+
+    setIsResolvingArcName(true);
+    try {
+      const resolved = await resolveArcName(input, provider);
+      setResolvedSendAddress(resolved);
+      return resolved;
+    } catch (err) {
+      setResolvedSendAddress(null);
+      throw err;
+    } finally {
+      setIsResolvingArcName(false);
+    }
+  };
+
+  const validateSendRecipient = (value: string) => {
+    const input = String(value).trim();
+    if (!input) {
+      setSendRecipientError('Enter a recipient address or ArcName handle.');
+      return false;
+    }
+
+    const looksLikeAddress = /^0x[a-fA-F0-9]{40}$/.test(input);
+    const looksLikeArcName = input.toLowerCase().endsWith('.arc');
+
+    if (looksLikeAddress) {
+      const checksum = ethers.getAddress(input);
+      setSendRecipientError('');
+      setResolvedSendAddress(checksum);
+      setIsResolvingArcName(false);
+      return true;
+    }
+
+    if (looksLikeArcName) {
+      setSendRecipientError('');
+      setResolvedSendAddress(null);
+      setIsResolvingArcName(false);
+      return true;
+    }
+
+    setSendRecipientError('Enter a valid checksummed address or a handle ending in .arc.');
+    setResolvedSendAddress(null);
+    setIsResolvingArcName(false);
+    return false;
+  };
+
+  const validateSendAmount = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) {
+      setSendAmountError('Enter an amount to send.');
+      return false;
+    }
+
+    const numericAmount = Number(normalized);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setSendAmountError('Enter a valid amount greater than zero.');
+      return false;
+    }
+
+    const availableBalance = Number.parseFloat(selectedSendAsset.balance);
+    if (Number.isFinite(availableBalance) && numericAmount > availableBalance) {
+      setSendAmountError(`Amount exceeds available ${selectedSendAsset.symbol} balance.`);
+      return false;
+    }
+
+    setSendAmountError('');
+    return true;
+  };
+
+  const handleSendReview = async () => {
+    const recipientValid = validateSendRecipient(sendAddress);
+    const amountValid = validateSendAmount(sendAmount);
+    if (!recipientValid || !amountValid || !wallet) {
+      return;
+    }
+
+    try {
+      await resolveRecipientAddress(sendAddress);
+    } catch (err) {
+      setSendRecipientError(err instanceof Error ? err.message : 'Unable to resolve ArcName handle.');
+      return;
+    }
+
+    setSendReview(true);
+    setTxState('idle');
+    setError(null);
+  };
+
   const handleSend = async () => {
     if (!wallet) return;
+    const amountValid = validateSendAmount(sendAmount);
+    const recipientValid = validateSendRecipient(sendAddress);
+    if (!amountValid || !recipientValid) {
+      return;
+    }
+
     setTxState('pending');
     setError(null);
     setTxHash(null);
 
     try {
-      const value = ethers.parseUnits(sendAmount, 18);
+      const resolvedRecipient = await resolveRecipientAddress(sendAddress);
+      const value = ethers.parseUnits(sendAmount, selectedSendAssetDecimals);
       const tx = {
-        to: sendAddress,
+        to: resolvedRecipient,
         value,
       };
       const response = await wallet.sendTransaction(tx);
       setTxHash(response.hash);
       setTxState('success');
+      setSendReview(false);
     } catch (err) {
       setTxState('error');
       setError(err instanceof Error ? err.message : 'Transaction failed.');
@@ -202,9 +364,9 @@ function App() {
 
   const address = wallet?.address ?? '';
   const visibleAssets = useMemo(() => {
-    const rawAssets = filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances);
-    return rawAssets.map((asset) => ({ ...asset, balance: formatDisplayBalance(asset.balance) }));
-  }, [assetBalances, tokenAssets]);
+    const rawAssets = sendAssets.map((asset) => ({ ...asset, balance: formatDisplayBalance(asset.balance) }));
+    return rawAssets;
+  }, [sendAssets]);
   const totalPortfolioValue = useMemo(() => {
     return formatDisplayBalance(
       visibleAssets.reduce((total, asset) => {
@@ -360,7 +522,7 @@ function App() {
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setShowSend(true)} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
+            <button onClick={openSendModal} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
               <Send className="h-4 w-4" />
               Send
             </button>
@@ -436,21 +598,135 @@ function App() {
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Send</h3>
-              <button onClick={() => setShowSend(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              <button onClick={() => {
+                setShowSend(false);
+                setSendReview(false);
+                setSendAmount('');
+                setSendAddress('');
+                setSendAmountError('');
+                setSendRecipientError('');
+                setResolvedSendAddress(null);
+                setIsResolvingArcName(false);
+              }} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
             <div className="mt-6 space-y-4">
-              <label className="block text-sm text-[#A1A1AA]">
-                Recipient address
-                <input value={sendAddress} onChange={(e) => setSendAddress(e.target.value)} className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none" placeholder="0x..." />
-              </label>
-              <label className="block text-sm text-[#A1A1AA]">
-                Amount in USDC
-                <input value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none" placeholder="0.10" />
-              </label>
-              <button onClick={() => void handleSend()} className="w-full rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB]">
-                Confirm payment
-              </button>
-              {txState === 'pending' ? <p className="text-sm text-[#A1A1AA]">Pending transaction…</p> : null}
+              {sendReview ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                    <div className="flex items-center justify-between text-sm text-[#A1A1AA]">
+                      <span>Asset</span>
+                      <span className="text-[#FAFAFA]">{selectedSendAsset.symbol}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
+                      <span>Amount</span>
+                      <span className="text-[#FAFAFA]">{sendAmount} {selectedSendAsset.symbol}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
+                      <span>Recipient</span>
+                      <span className="break-all text-right text-[#FAFAFA]">{sendAddress}</span>
+                    </div>
+                    {isResolvingArcName ? (
+                      <div className="mt-3 rounded-xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-xs text-[#93C5FD]">
+                        Resolving ArcName handle…
+                      </div>
+                    ) : null}
+                    {resolvedSendAddress ? (
+                      <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
+                        <span>Resolved address</span>
+                        <span className="break-all text-right text-[#FAFAFA]">{resolvedSendAddress}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <button
+                    onClick={() => void handleSend()}
+                    disabled={txState === 'pending' || isResolvingArcName}
+                    className="w-full rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {txState === 'pending' ? 'Sending…' : 'Send Now'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="block text-sm text-[#A1A1AA]">
+                    Asset
+                    <select
+                      value={sendAssetKey}
+                      onChange={(e) => {
+                        setSendAssetKey(e.target.value);
+                        setSendAmountError('');
+                      }}
+                      className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                    >
+                      {sendAssets.map((asset) => (
+                        <option key={asset.key} value={asset.key}>
+                          {asset.symbol}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block text-sm text-[#A1A1AA]">
+                    Recipient address or ArcName
+                    <input
+                      value={sendAddress}
+                      onChange={(e) => {
+                        setSendAddress(e.target.value);
+                        validateSendRecipient(e.target.value);
+                      }}
+                      className={`mt-2 w-full rounded-xl border bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}
+                      placeholder="0x... or name.arc"
+                    />
+                    {sendRecipientError ? <p className="mt-2 text-xs text-red-400">{sendRecipientError}</p> : null}
+                    {isResolvingArcName ? (
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
+                        Resolving ArcName handle…
+                      </div>
+                    ) : null}
+                  </label>
+
+                  <label className="block text-sm text-[#A1A1AA]">
+                    Amount
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3">
+                      <input
+                        value={sendAmount}
+                        onChange={(e) => {
+                          setSendAmount(e.target.value);
+                          validateSendAmount(e.target.value);
+                        }}
+                        className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                        placeholder="0.10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSendAmount(selectedSendAsset.balance);
+                          setSendAmountError('');
+                        }}
+                        disabled={txState === 'pending'}
+                        className="rounded-full border border-[#27272A] px-2 py-1 text-[11px] text-[#A1A1AA]"
+                      >
+                        Max
+                      </button>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-[#A1A1AA]">
+                      <span>Available: {formatDisplayBalance(selectedSendAsset.balance)} {selectedSendAsset.symbol}</span>
+                      <span>Decimals: {selectedSendAssetDecimals}</span>
+                    </div>
+                    {sendAmountError ? <p className="mt-2 text-xs text-red-400">{sendAmountError}</p> : null}
+                  </label>
+
+                  <button
+                    onClick={() => void handleSendReview()}
+                    disabled={txState === 'pending' || isResolvingArcName}
+                    className="w-full rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {txState === 'pending' ? 'Confirming…' : 'Confirm payment'}
+                  </button>
+                </>
+              )}
+
               {txState === 'success' && txHash ? (
                 <div className="rounded-2xl border border-emerald-700/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
                   <p>Transaction sent successfully.</p>
