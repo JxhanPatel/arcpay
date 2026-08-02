@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
-import { ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, ScanLine, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { BrowserQRCodeReader } from '@zxing/browser';
 import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
 import { resolveArcName } from './utils/arcName';
 
@@ -27,6 +28,58 @@ const isValidPrivateKey = (input: string) => {
 
 type ArcWallet = ethers.Wallet | ethers.HDNodeWallet;
 
+type ScanPayload =
+  | { kind: 'pay'; id: string }
+  | { kind: 'request'; id: string; amount: string; note: string }
+  | { kind: 'address'; id: string };
+
+type BarcodeDetectorLike = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>>;
+};
+
+type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
+
+export const parseScanPayload = (rawInput: string): ScanPayload | null => {
+  const trimmed = String(rawInput ?? '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const looksLikeAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmed);
+  if (looksLikeAddress) {
+    return { kind: 'address', id: trimmed };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'arcpay:') {
+      return null;
+    }
+
+    const host = parsed.host.toLowerCase();
+    const lookupId = parsed.searchParams.get('id');
+
+    if (host === 'pay' && lookupId) {
+      return { kind: 'pay', id: lookupId };
+    }
+
+    if (host === 'request' && lookupId) {
+      const amount = parsed.searchParams.get('amount') ?? '';
+      const note = parsed.searchParams.get('note') ?? '';
+      return {
+        kind: 'request',
+        id: lookupId,
+        amount,
+        note,
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 const parseWalletInput = (input: string): ArcWallet => {
   const normalized = input.trim();
   if (/^0x[0-9a-fA-F]{64}$/.test(normalized)) {
@@ -51,6 +104,7 @@ function App() {
   const [showReceive, setShowReceive] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
@@ -71,6 +125,14 @@ function App() {
   const [showAssetBreakdown, setShowAssetBreakdown] = useState(false);
   const [resolvedSendAddress, setResolvedSendAddress] = useState<string | null>(null);
   const [isResolvingArcName, setIsResolvingArcName] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [scannerSuccess, setScannerSuccess] = useState(false);
+  const [scannedRequestNote, setScannedRequestNote] = useState('');
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerStreamRef = useRef<MediaStream | null>(null);
+  const scannerLoopRef = useRef<number | null>(null);
+  const fallbackReaderRef = useRef<BrowserQRCodeReader | null>(null);
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
@@ -192,7 +254,7 @@ function App() {
     setTxState('idle');
   };
 
-  const openSendModal = () => {
+  const openSendModal = (scanDetails?: { recipient?: string; amount?: string; note?: string }) => {
     const defaultAsset = [
       ...tokenAssets,
       ...assetBalances,
@@ -202,8 +264,9 @@ function App() {
     ].find((asset) => Number(asset.balance) > 0) ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
 
     setSendAssetKey(defaultAsset.key);
-    setSendAddress('');
-    setSendAmount('');
+    setSendAddress(scanDetails?.recipient ?? '');
+    setSendAmount(scanDetails?.amount ?? '');
+    setScannedRequestNote(scanDetails?.note ?? '');
     setSendReview(false);
     setSendRecipientError('');
     setSendAmountError('');
@@ -298,6 +361,65 @@ function App() {
 
   const selectedSendAssetDecimals = selectedSendAsset.decimals ?? 6;
   const selectedRequestAssetDecimals = selectedRequestAsset.decimals ?? 6;
+
+  const stopScannerStream = () => {
+    if (scannerLoopRef.current) {
+      window.clearInterval(scannerLoopRef.current);
+      scannerLoopRef.current = null;
+    }
+
+    if (scannerStreamRef.current) {
+      scannerStreamRef.current.getTracks().forEach((track) => track.stop());
+      scannerStreamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const handleScanPayload = (decodedValue: string) => {
+    const parsedPayload = parseScanPayload(decodedValue);
+
+    if (!parsedPayload) {
+      setScannerError('This QR code isn\'t a valid ArcPay link');
+      return;
+    }
+
+    if (parsedPayload.kind === 'address') {
+      setScannerSuccess(true);
+      window.setTimeout(() => {
+        setShowScanner(false);
+        setScannerError(null);
+        setScannerSuccess(false);
+        openSendModal({ recipient: parsedPayload.id });
+      }, 700);
+      return;
+    }
+
+    if (parsedPayload.kind === 'pay') {
+      setScannerSuccess(true);
+      window.setTimeout(() => {
+        setShowScanner(false);
+        setScannerError(null);
+        setScannerSuccess(false);
+        openSendModal({ recipient: parsedPayload.id });
+      }, 700);
+      return;
+    }
+
+    setScannerSuccess(true);
+    window.setTimeout(() => {
+      setShowScanner(false);
+      setScannerError(null);
+      setScannerSuccess(false);
+      openSendModal({
+        recipient: parsedPayload.id,
+        amount: parsedPayload.amount,
+        note: parsedPayload.note,
+      });
+    }, 700);
+  };
 
   const requestLink = useMemo(() => {
     if (!wallet) {
@@ -397,6 +519,91 @@ function App() {
     setSendAmountError('');
     return true;
   };
+
+  const startScanner = async () => {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setScannerError('Camera scanning is not supported in this browser.');
+      return;
+    }
+
+    setScannerError(null);
+    setScannerSuccess(false);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      });
+
+      scannerStreamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      const BarcodeDetectorConstructor = (window as Window & typeof globalThis & {
+        BarcodeDetector?: BarcodeDetectorCtor;
+      }).BarcodeDetector;
+
+      if (BarcodeDetectorConstructor) {
+        const detector = new BarcodeDetectorConstructor({ formats: ['qr_code'] });
+        scannerLoopRef.current = window.setInterval(async () => {
+          if (!videoRef.current || !showScanner) {
+            return;
+          }
+
+          try {
+            const detected = await detector.detect(videoRef.current);
+            const firstResult = detected[0]?.rawValue?.trim();
+            if (firstResult) {
+              window.clearInterval(scannerLoopRef.current ?? undefined);
+              handleScanPayload(firstResult);
+            }
+          } catch {
+            // Ignore frame detection errors and keep trying.
+          }
+        }, 700);
+        return;
+      }
+
+      const reader = new BrowserQRCodeReader();
+      fallbackReaderRef.current = reader;
+      scannerLoopRef.current = window.setInterval(async () => {
+        if (!videoRef.current || !showScanner) {
+          return;
+        }
+
+        try {
+          const result = await reader.decodeOnceFromVideoDevice(undefined, videoRef.current);
+          const decoded = result?.getText?.().trim();
+          if (decoded) {
+            window.clearInterval(scannerLoopRef.current ?? undefined);
+            handleScanPayload(decoded);
+          }
+        } catch {
+          // Ignore decode errors and keep trying.
+        }
+      }, 1000);
+    } catch {
+      setScannerError('Camera permission was denied or no camera is available.');
+    }
+  };
+
+  useEffect(() => {
+    if (showScanner) {
+      void startScanner();
+    } else {
+      stopScannerStream();
+    }
+
+    return () => {
+      stopScannerStream();
+    };
+  }, [showScanner]);
 
   const handleSendReview = async () => {
     const recipientValid = validateSendRecipient(sendAddress);
@@ -605,8 +812,8 @@ function App() {
               Refresh
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={openSendModal} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={() => openSendModal()} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
               <Send className="h-4 w-4" />
               Send
             </button>
@@ -617,6 +824,10 @@ function App() {
             <button onClick={openRequestModal} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
               <QrCode className="h-4 w-4" />
               Request
+            </button>
+            <button onClick={() => setShowScanner(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <ScanLine className="h-4 w-4" />
+              Scan
             </button>
           </div>
         </section>
@@ -788,6 +999,41 @@ function App() {
         </div>
       ) : null}
 
+      {showScanner ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-5 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-semibold">Scan QR</h3>
+                <p className="text-xs text-[#A1A1AA]">Point your camera at an ArcPay deep link.</p>
+              </div>
+              <button onClick={() => setShowScanner(false)} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#27272A] bg-[#0a0a0a]">
+              <div className="relative aspect-[4/5] w-full bg-black">
+                <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
+                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#3B82F6]/80" />
+                <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20" />
+                {scannerSuccess ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#3B82F6]/10 backdrop-blur-[1px]">
+                    <div className="rounded-full border border-[#3B82F6]/40 bg-[#121212]/80 px-4 py-2 text-sm font-medium text-[#93C5FD]">
+                      Scan complete
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {scannerError ? (
+              <div className="mt-4 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+                {scannerError}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {showSend ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
@@ -801,6 +1047,7 @@ function App() {
                 setSendAmountError('');
                 setSendRecipientError('');
                 setResolvedSendAddress(null);
+                setScannedRequestNote('');
                 setIsResolvingArcName(false);
               }} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
@@ -860,6 +1107,13 @@ function App() {
                       ))}
                     </select>
                   </label>
+
+                  {scannedRequestNote ? (
+                    <div className="rounded-2xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-sm text-[#93C5FD]">
+                      <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Requested</p>
+                      <p className="mt-2 break-words text-[#FAFAFA]">{scannedRequestNote}</p>
+                    </div>
+                  ) : null}
 
                   <label className="block text-sm text-[#A1A1AA]">
                     Recipient address or ArcName
