@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
-import { ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
+import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
 import { resolveArcName } from './utils/arcName';
 
 const STORAGE_KEY = 'arc_wallet_pk';
@@ -50,12 +50,17 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [showReceive, setShowReceive] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
   const [sendReview, setSendReview] = useState(false);
   const [sendRecipientError, setSendRecipientError] = useState('');
   const [sendAmountError, setSendAmountError] = useState('');
+  const [requestAssetKey, setRequestAssetKey] = useState('usdc');
+  const [requestAmount, setRequestAmount] = useState('');
+  const [requestNote, setRequestNote] = useState('');
+  const [requestAmountError, setRequestAmountError] = useState('');
   const [txState, setTxState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -182,6 +187,7 @@ function App() {
     setError(null);
     setShowReceive(false);
     setShowSend(false);
+    setShowRequest(false);
     setTxHash(null);
     setTxState('idle');
   };
@@ -215,6 +221,63 @@ function App() {
     window.setTimeout(() => setCopied(false), 1300);
   };
 
+  const requestAssets = useMemo(() => {
+    const sourceAssets = tokenAssets.length > 0 ? tokenAssets : assetBalances;
+    const nonZeroAssets = filterNonZeroAssetBalances(sourceAssets);
+    const hasUsdc = nonZeroAssets.some((asset) => asset.symbol === 'USDC');
+
+    if (hasUsdc) {
+      return nonZeroAssets;
+    }
+
+    return [
+      { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 },
+      ...nonZeroAssets,
+    ];
+  }, [assetBalances, tokenAssets]);
+
+  const openRequestModal = () => {
+    const defaultAsset = requestAssets.find((asset) => asset.symbol === 'USDC')
+      ?? requestAssets.find((asset) => Number(asset.balance) > 0)
+      ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+
+    setRequestAssetKey(defaultAsset.key);
+    setRequestAmount('');
+    setRequestNote('');
+    setRequestAmountError('');
+    setShowRequest(true);
+  };
+
+  const getRequestAmountError = (value: string, asset = selectedRequestAsset) => {
+    const normalized = value.trim();
+    if (!normalized) {
+      return 'Enter an amount to request.';
+    }
+
+    const numericAmount = Number(normalized);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return 'Enter a valid amount greater than zero.';
+    }
+
+    const [whole, fraction = ''] = normalized.split('.');
+    if (whole.startsWith('-') || whole === '') {
+      return 'Enter a valid amount greater than zero.';
+    }
+
+    const decimals = asset.decimals ?? 6;
+    if (fraction.length > decimals) {
+      return `Amount exceeds ${asset.symbol} precision (${decimals} decimals max).`;
+    }
+
+    return '';
+  };
+
+  const validateRequestAmount = (value: string) => {
+    const error = getRequestAmountError(value, selectedRequestAsset);
+    setRequestAmountError(error);
+    return !error;
+  };
+
   const sendAssets = useMemo(() => {
     return filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances);
   }, [assetBalances, tokenAssets]);
@@ -226,7 +289,28 @@ function App() {
       ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
   }, [sendAssetKey, sendAssets]);
 
+  const selectedRequestAsset = useMemo(() => {
+    return requestAssets.find((asset) => asset.key === requestAssetKey)
+      ?? requestAssets.find((asset) => asset.symbol === 'USDC')
+      ?? requestAssets[0]
+      ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+  }, [requestAssetKey, requestAssets]);
+
   const selectedSendAssetDecimals = selectedSendAsset.decimals ?? 6;
+  const selectedRequestAssetDecimals = selectedRequestAsset.decimals ?? 6;
+
+  const requestLink = useMemo(() => {
+    if (!wallet) {
+      return '';
+    }
+
+    const amountError = getRequestAmountError(requestAmount, selectedRequestAsset);
+    if (amountError) {
+      return '';
+    }
+
+    return buildRequestLink(wallet.address, requestAmount, requestNote);
+  }, [requestAmount, requestNote, selectedRequestAsset, wallet]);
 
   const resolveRecipientAddress = async (value: string) => {
     const input = String(value).trim();
@@ -521,7 +605,7 @@ function App() {
               Refresh
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button onClick={openSendModal} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
               <Send className="h-4 w-4" />
               Send
@@ -529,6 +613,10 @@ function App() {
             <button onClick={() => setShowReceive(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
               <Download className="h-4 w-4" />
               Receive
+            </button>
+            <button onClick={openRequestModal} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <QrCode className="h-4 w-4" />
+              Request
             </button>
           </div>
         </section>
@@ -588,6 +676,113 @@ function App() {
                 <Copy className="h-4 w-4" />
                 Copy address
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showRequest ? (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Request</h3>
+              <button onClick={() => {
+                setShowRequest(false);
+                setRequestAssetKey('usdc');
+                setRequestAmount('');
+                setRequestNote('');
+                setRequestAmountError('');
+              }} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <label className="block text-sm text-[#A1A1AA]">
+                Asset
+                <select
+                  value={requestAssetKey}
+                  onChange={(e) => {
+                    setRequestAssetKey(e.target.value);
+                    setRequestAmountError('');
+                  }}
+                  className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                >
+                  {requestAssets.map((asset) => (
+                    <option key={asset.key} value={asset.key}>
+                      {asset.symbol}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-sm text-[#A1A1AA]">
+                Amount
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3">
+                  <input
+                    value={requestAmount}
+                    onChange={(e) => {
+                      setRequestAmount(e.target.value);
+                      validateRequestAmount(e.target.value);
+                    }}
+                    className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                    placeholder="12.50"
+                  />
+                  <span className="text-[11px] text-[#A1A1AA]">{selectedRequestAsset.symbol}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-[#A1A1AA]">
+                  <span>Precision: {selectedRequestAssetDecimals}</span>
+                  <span>Default: {selectedRequestAsset.symbol}</span>
+                </div>
+                {requestAmountError ? <p className="mt-2 text-xs text-red-400">{requestAmountError}</p> : null}
+              </label>
+
+              <label className="block text-sm text-[#A1A1AA]">
+                Note (optional)
+                <textarea
+                  value={requestNote}
+                  onChange={(e) => {
+                    const nextValue = e.target.value.slice(0, 140);
+                    setRequestNote(nextValue);
+                  }}
+                  rows={3}
+                  maxLength={140}
+                  className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                  placeholder="Dinner split"
+                />
+                <div className="mt-2 text-right text-[11px] text-[#A1A1AA]">{requestNote.length}/140</div>
+              </label>
+
+              {requestLink ? (
+                <div className="space-y-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                      <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
+                    </div>
+                    <label className="w-full text-sm text-[#A1A1AA]">
+                      Deep link
+                      <input
+                        readOnly
+                        value={requestLink}
+                        className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                      />
+                    </label>
+                    <button
+                      onClick={async () => {
+                        if (!requestLink) return;
+                        await navigator.clipboard.writeText(requestLink);
+                        setCopied(true);
+                        window.setTimeout(() => setCopied(false), 1300);
+                      }}
+                      className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA]"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy request link
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
+                  Enter a valid positive amount to generate a shareable request QR code and deep link.
+                </div>
+              )}
             </div>
           </div>
         </div>

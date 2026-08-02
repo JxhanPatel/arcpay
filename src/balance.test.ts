@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
+import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
 
 describe('formatTokenBalance', () => {
   it('formats USDC balances from raw token units', () => {
@@ -13,6 +13,20 @@ describe('formatDisplayBalance', () => {
     expect(formatDisplayBalance('18.901234')).toBe('18.90');
     expect(formatDisplayBalance('20')).toBe('20.00');
     expect(formatDisplayBalance('0')).toBe('0.00');
+  });
+});
+
+describe('buildRequestLink', () => {
+  it('builds a request deep link with URL-encoded note text and a positive amount', () => {
+    expect(buildRequestLink('0x1234567890abcdef1234567890abcdef12345678', '12.50', 'Dinner Split')).toBe(
+      'arcpay://request?id=0x1234567890abcdef1234567890abcdef12345678&amount=12.50&note=Dinner%20Split',
+    );
+  });
+
+  it('omits the note parameter entirely when the note is empty', () => {
+    expect(buildRequestLink('0x1234567890abcdef1234567890abcdef12345678', '12.50', '')).toBe(
+      'arcpay://request?id=0x1234567890abcdef1234567890abcdef12345678&amount=12.50',
+    );
   });
 });
 

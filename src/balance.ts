@@ -30,6 +30,23 @@ export const formatDisplayBalance = (balance: string | number) => {
   }).format(numericValue);
 };
 
+export const buildRequestLink = (id: string, amount: string, note = '') => {
+  const normalizedId = id.trim();
+  const normalizedAmount = amount.trim();
+  const normalizedNote = note.trim();
+
+  if (!normalizedId || !normalizedAmount) {
+    return '';
+  }
+
+  const baseLink = `arcpay://request?id=${normalizedId}&amount=${normalizedAmount}`;
+  if (!normalizedNote) {
+    return baseLink;
+  }
+
+  return `${baseLink}&note=${encodeURIComponent(normalizedNote)}`;
+};
+
 export const filterNonZeroAssetBalances = (assets: AssetBalance[]) => {
   return assets.filter((asset) => {
     const normalized = Number(asset.balance);
