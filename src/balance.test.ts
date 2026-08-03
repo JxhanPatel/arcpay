@@ -40,4 +40,18 @@ describe('filterNonZeroAssetBalances', () => {
 
     expect(filterNonZeroAssetBalances(assets)).toEqual([{ key: 'usdc', symbol: 'USDC', balance: '20' }]);
   });
+
+  it('keeps USDC first even when the explorer response returns it later in the array', () => {
+    const assets = [
+      { key: 'arc', symbol: 'ARC', balance: '5' },
+      { key: 'eurc', symbol: 'EURC', balance: '2' },
+      { key: 'usdc', symbol: 'USDC', balance: '20' },
+    ];
+
+    expect(filterNonZeroAssetBalances(assets)).toEqual([
+      { key: 'usdc', symbol: 'USDC', balance: '20' },
+      { key: 'arc', symbol: 'ARC', balance: '5' },
+      { key: 'eurc', symbol: 'EURC', balance: '2' },
+    ]);
+  });
 });

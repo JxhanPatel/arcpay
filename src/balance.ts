@@ -48,8 +48,18 @@ export const buildRequestLink = (id: string, amount: string, note = '') => {
 };
 
 export const filterNonZeroAssetBalances = (assets: AssetBalance[]) => {
-  return assets.filter((asset) => {
+  const nonZeroAssets = assets.filter((asset) => {
     const normalized = Number(asset.balance);
     return Number.isFinite(normalized) && normalized > 0;
+  });
+
+  return nonZeroAssets.sort((left, right) => {
+    if (left.symbol === 'USDC') {
+      return -1;
+    }
+    if (right.symbol === 'USDC') {
+      return 1;
+    }
+    return 0;
   });
 };
