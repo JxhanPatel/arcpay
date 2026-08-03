@@ -4,6 +4,9 @@ node_modules/
 # Build output
 /dist/
 /.vite/
+.cache/
+.parcel-cache/
+.nyc_output/
 *.tsbuildinfo
 
 # Environment files

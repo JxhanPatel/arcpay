@@ -5,6 +5,115 @@ export type AssetBalance = {
   decimals?: number;
 };
 
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const toBigInt = (value: unknown) => {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+
+  const rawValue = String(value ?? '0').trim();
+  if (!rawValue) {
+    return 0n;
+  }
+
+  if (/^0x[0-9a-fA-F]+$/.test(rawValue)) {
+    return BigInt(rawValue);
+  }
+
+  return BigInt(rawValue);
+};
+
+export const getAssetDecimals = (symbol?: string) => {
+  const normalized = String(symbol ?? '').toUpperCase();
+  if (normalized === 'USDC' || normalized === 'EURC') {
+    return 6;
+  }
+
+  return 18;
+};
+
+export const parseTransactionDirection = (walletAddress: string, from: string, to: string) => {
+  const normalizedWallet = String(walletAddress ?? '').toLowerCase();
+  const normalizedFrom = String(from ?? '').toLowerCase();
+  const normalizedTo = String(to ?? '').toLowerCase();
+
+  if (normalizedFrom === normalizedWallet) {
+    return 'sent';
+  }
+
+  if (normalizedTo === normalizedWallet) {
+    return 'received';
+  }
+
+  return 'sent';
+};
+
+export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) => {
+  const tokenPayload = isObjectRecord(transaction.token) ? transaction.token : null;
+  const tokenTransfers = Array.isArray(transaction.token_transfers)
+    ? transaction.token_transfers.filter(isObjectRecord)
+    : [];
+  const firstTransfer = tokenTransfers[0] ?? null;
+  const firstTransferTotal = isObjectRecord(firstTransfer?.total) ? firstTransfer.total : null;
+  const transactionTotal = isObjectRecord(transaction.total) ? transaction.total : null;
+  const transferToken = isObjectRecord(firstTransfer?.token) ? firstTransfer.token : null;
+  const tokenIsPresent = Object.prototype.hasOwnProperty.call(transaction, 'token');
+  const hasTokenPayload = tokenIsPresent && tokenPayload !== null;
+  const isNativeTransfer = !hasTokenPayload && tokenTransfers.length === 0;
+
+  if (isNativeTransfer) {
+    const nativeValue = String(transaction.value ?? transaction.amount ?? '0');
+    const rawValue = toBigInt(nativeValue);
+    return {
+      symbol: 'USDC',
+      decimals: 6,
+      rawValue,
+    };
+  }
+
+  const transferSymbol = String(
+    transferToken?.symbol
+      ?? firstTransfer?.symbol
+      ?? tokenPayload?.symbol
+      ?? 'TOKEN',
+  );
+  const transferDecimals = Number(
+    transferToken?.decimals
+      ?? firstTransfer?.decimals
+      ?? tokenPayload?.decimals
+      ?? getAssetDecimals(transferSymbol),
+  );
+  const transferValue = String(
+    firstTransferTotal?.value
+      ?? firstTransfer?.value
+      ?? transactionTotal?.value
+      ?? transaction.amount
+      ?? transaction.value
+      ?? '0',
+  );
+  const rawValue = toBigInt(transferValue);
+  const normalizedAmount = Number(formatTokenBalance(rawValue, Number.isFinite(transferDecimals) ? transferDecimals : getAssetDecimals(transferSymbol)));
+
+  if (Number.isFinite(normalizedAmount) && Math.abs(normalizedAmount) > 1_000_000) {
+    console.warn('[arcpay:tx-display-meta] suspicious amount detected', {
+      transaction,
+      symbol: transferSymbol,
+      decimals: Number.isFinite(transferDecimals) ? transferDecimals : getAssetDecimals(transferSymbol),
+      rawValue: transferValue,
+      normalizedAmount,
+    });
+  }
+
+  return {
+    symbol: transferSymbol,
+    decimals: Number.isFinite(transferDecimals) ? transferDecimals : getAssetDecimals(transferSymbol),
+    rawValue,
+  };
+};
+
 export const formatTokenBalance = (rawBalance: bigint, decimals: number) => {
   const scale = 10n ** BigInt(decimals);
   const whole = rawBalance / scale;

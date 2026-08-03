@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
+import {
+  buildRequestLink,
+  filterNonZeroAssetBalances,
+  formatDisplayBalance,
+  formatTokenBalance,
+  getAssetDecimals,
+  getTransactionDisplayMeta,
+  parseTransactionDirection,
+} from './balance';
 
 describe('formatTokenBalance', () => {
   it('formats USDC balances from raw token units', () => {
@@ -13,6 +21,68 @@ describe('formatDisplayBalance', () => {
     expect(formatDisplayBalance('18.901234')).toBe('18.90');
     expect(formatDisplayBalance('20')).toBe('20.00');
     expect(formatDisplayBalance('0')).toBe('0.00');
+  });
+});
+
+describe('parseTransactionDirection', () => {
+  it('classifies wallet-owned outbound transactions as sent and inbound transactions as received', () => {
+    expect(parseTransactionDirection('0x1111111111111111111111111111111111111111', '0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222')).toBe('sent');
+    expect(parseTransactionDirection('0x1111111111111111111111111111111111111111', '0x2222222222222222222222222222222222222222', '0x1111111111111111111111111111111111111111')).toBe('received');
+  });
+
+  it('matches addresses case-insensitively', () => {
+    expect(parseTransactionDirection('0xAbC1234567890abcdef1234567890abcdef1234', '0xAbC1234567890abcdef1234567890abcdef1234', '0xDEF1234567890abcdef1234567890abcdef1234')).toBe('sent');
+    expect(parseTransactionDirection('0xAbC1234567890abcdef1234567890abcdef1234', '0xDEF1234567890abcdef1234567890abcdef1234', '0xabc1234567890abcdef1234567890abcdef1234')).toBe('received');
+  });
+});
+
+describe('getAssetDecimals', () => {
+  it('uses the Arc Pay token precision rules for stable assets', () => {
+    expect(getAssetDecimals('USDC')).toBe(6);
+    expect(getAssetDecimals('EURC')).toBe(6);
+    expect(getAssetDecimals('ARC')).toBe(18);
+  });
+});
+
+describe('getTransactionDisplayMeta', () => {
+  it('formats native transfers as USDC with 6 decimals instead of defaulting to ARC', () => {
+    const nativeTx = {
+      value: '100000',
+      token: null,
+      token_transfers: [],
+    };
+
+    const meta = getTransactionDisplayMeta(nativeTx as Record<string, unknown>);
+
+    expect(meta.symbol).toBe('USDC');
+    expect(meta.decimals).toBe(6);
+    expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('0.1');
+    expect(formatDisplayBalance(formatTokenBalance(meta.rawValue, meta.decimals))).toBe('0.10');
+    expect(meta.symbol).not.toBe('ARC');
+  });
+
+  it('preserves explicit token symbol and decimals for token transfers', () => {
+    const tokenTx = {
+      value: '0',
+      token: null,
+      token_transfers: [
+        {
+          value: '2500000',
+          total: { value: '2500000' },
+          token: {
+            symbol: 'EURC',
+            decimals: 6,
+          },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(tokenTx as Record<string, unknown>);
+
+    expect(meta.symbol).toBe('EURC');
+    expect(meta.decimals).toBe(6);
+    expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('2.5');
+    expect(meta.symbol).not.toBe('USDC');
   });
 });
 

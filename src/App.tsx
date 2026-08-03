@@ -1,9 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
-import { Camera, CheckCircle2, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, ScanLine, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Camera,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Copy,
+  ExternalLink,
+  LoaderCircle,
+  Lock,
+  RefreshCcw,
+  ScanLine,
+  Send,
+  Wallet,
+  Download,
+  Upload,
+  QrCode,
+} from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { BrowserQRCodeReader } from '@zxing/browser';
-import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
+import {
+  buildRequestLink,
+  filterNonZeroAssetBalances,
+  formatDisplayBalance,
+  formatTokenBalance,
+  getAssetDecimals,
+  getTransactionDisplayMeta,
+  parseTransactionDirection,
+} from './balance';
 import { resolveArcName } from './utils/arcName';
 
 const STORAGE_KEY = 'arc_wallet_pk';
@@ -38,6 +65,216 @@ type BarcodeDetectorLike = {
 };
 
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
+
+type TransactionHistoryItem = {
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  tokenSymbol: string;
+  decimals: number;
+  timestamp: number;
+  direction: 'sent' | 'received';
+  status: 'ok' | 'pending' | 'error';
+};
+
+const toBigInt = (value: unknown) => {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+
+  const rawValue = String(value ?? '0').trim();
+  if (!rawValue) {
+    return 0n;
+  }
+
+  if (/^0x[0-9a-fA-F]+$/.test(rawValue)) {
+    return BigInt(rawValue);
+  }
+
+  return BigInt(rawValue);
+};
+
+const formatTimestamp = (timestamp: number) => {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return 'Just now';
+  }
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 60) {
+    return 'Just now';
+  }
+
+  if (diffSeconds < 3600) {
+    return `${Math.floor(diffSeconds / 60)}m ago`;
+  }
+
+  if (diffSeconds < 86400) {
+    return `${Math.floor(diffSeconds / 3600)}h ago`;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(timestamp);
+};
+
+const truncateAddress = (value: string) => {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) {
+    return 'Unknown';
+  }
+
+  if (normalized.length <= 10) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
+};
+
+const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
+  ok: {
+    label: 'Success',
+    className: 'border-emerald-700/40 bg-emerald-500/10 text-emerald-300',
+  },
+  error: {
+    label: 'Failed',
+    className: 'border-red-700/40 bg-red-500/10 text-red-400',
+  },
+  pending: {
+    label: 'Pending',
+    className: 'border-[#27272A] bg-[#161616] text-[#A1A1AA]',
+  },
+};
+
+const normalizeExplorerStatus = (value: string) => {
+  const status = String(value ?? '').trim().toLowerCase();
+  if (status.includes('pending')) {
+    return 'pending' as const;
+  }
+
+  if (status.includes('fail') || status.includes('error') || status.includes('rejected')) {
+    return 'error' as const;
+  }
+
+  if (status === 'ok' || status === 'success') {
+    return 'ok' as const;
+  }
+
+  return 'pending' as const;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
+  return isPlainObject(value);
+};
+
+const fetchTransactionDetail = async (hash: string) => {
+  const detailResponse = await fetch(`${ARC_EXPLORER_API_URL}/transactions/${hash}`);
+  if (!detailResponse.ok) {
+    return null;
+  }
+
+  return detailResponse.json() as Promise<Record<string, unknown> | null>;
+};
+
+export const fetchTransactionHistory = async (address: string): Promise<TransactionHistoryItem[]> => {
+  const normalizedAddress = String(address ?? '').trim();
+  if (!normalizedAddress) {
+    return [];
+  }
+
+  const explorerResponse = await fetch(`${ARC_EXPLORER_API_URL}/addresses/${normalizedAddress}/transactions`);
+  if (!explorerResponse.ok) {
+    throw new Error('Unable to load transaction history from Arc explorer.');
+  }
+
+  const payload = await explorerResponse.json();
+  const candidates = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { items?: unknown[] }).items)
+      ? (payload as { items?: unknown[] }).items ?? []
+      : Array.isArray((payload as { transactions?: unknown[] }).transactions)
+        ? (payload as { transactions?: unknown[] }).transactions ?? []
+        : Array.isArray((payload as { result?: unknown[] }).result)
+          ? (payload as { result?: unknown[] }).result ?? []
+          : [];
+
+  const normalizedCandidates = await Promise.all(
+    candidates.map(async (item) => {
+      if (!isPlainObject(item)) {
+        return null;
+      }
+
+      const hash = String(item.hash ?? item.transaction_hash ?? item.tx_hash ?? '');
+      const transactionTypes = Array.isArray(item.transaction_types)
+        ? item.transaction_types.map((entry) => String(entry ?? '').toLowerCase())
+        : [];
+      const hasTokenTransferType = transactionTypes.includes('token_transfer');
+      const tokenTransfers = Array.isArray(item.token_transfers)
+        ? item.token_transfers.filter(isObjectRecord)
+        : [];
+      const detailItem = hasTokenTransferType && tokenTransfers.length === 0 && hash
+        ? await fetchTransactionDetail(hash)
+        : null;
+      const sourceItem = detailItem && isPlainObject(detailItem) ? detailItem : item;
+
+      const txFrom = String(
+        (sourceItem.from as { address_hash?: string; hash?: string } | undefined)?.address_hash
+          ?? (sourceItem.from as { address_hash?: string; hash?: string } | undefined)?.hash
+          ?? (sourceItem.from as string | undefined)
+          ?? (sourceItem.sender as string | undefined)
+          ?? '',
+      );
+      const txTo = String(
+        (sourceItem.to as { address_hash?: string; hash?: string } | undefined)?.address_hash
+          ?? (sourceItem.to as { address_hash?: string; hash?: string } | undefined)?.hash
+          ?? (sourceItem.to as string | undefined)
+          ?? (sourceItem.receiver as string | undefined)
+          ?? '',
+      );
+      const displayMeta = getTransactionDisplayMeta(sourceItem as Record<string, unknown>);
+      const status = normalizeExplorerStatus(String(sourceItem.status ?? sourceItem.tx_status ?? sourceItem.state ?? 'ok'));
+      const rawTimestamp = Number(
+        sourceItem.timestamp
+          ?? sourceItem.block_timestamp
+          ?? sourceItem.time_stamp
+          ?? sourceItem.created_at
+          ?? sourceItem.time
+          ?? 0,
+      );
+      const parsedTimestamp = Number.isFinite(rawTimestamp) ? rawTimestamp : Date.parse(String(sourceItem.timestamp ?? sourceItem.created_at ?? new Date().toISOString()));
+
+      if (!hash) {
+        return null;
+      }
+
+      const direction = parseTransactionDirection(normalizedAddress, txFrom, txTo);
+
+      return {
+        hash,
+        from: txFrom,
+        to: txTo,
+        value: formatTokenBalance(displayMeta.rawValue, displayMeta.decimals),
+        tokenSymbol: displayMeta.symbol,
+        decimals: displayMeta.decimals,
+        timestamp: Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now(),
+        direction,
+        status,
+      } satisfies TransactionHistoryItem;
+    }),
+  );
+
+  return normalizedCandidates
+    .filter((value): value is TransactionHistoryItem => value !== null)
+    .sort((left, right) => (right?.timestamp ?? 0) - (left?.timestamp ?? 0))
+    .slice(0, 50);
+};
 
 export const parseScanPayload = (rawInput: string): ScanPayload | null => {
   const trimmed = String(rawInput ?? '').trim();
@@ -105,6 +342,10 @@ function App() {
   const [showSend, setShowSend] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [transactions, setTransactions] = useState<TransactionHistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
@@ -145,7 +386,7 @@ function App() {
         const parsed = new ethers.Wallet(stored, provider);
         setPrivateKey(stored);
         setWallet(parsed);
-        void refreshBalance(parsed);
+        void refreshWalletData(parsed);
       } catch {
         localStorage.removeItem(STORAGE_KEY);
         setPrivateKey(null);
@@ -173,14 +414,14 @@ function App() {
       const normalizedAssets = tokens
         .filter((token) => token.token?.symbol && token.value)
         .map((token) => {
-          const decimals = Number(token.token?.decimals ?? 18);
-          const normalizedBalance = formatTokenBalance(BigInt(token.value ?? '0'), Number.isFinite(decimals) ? decimals : 18);
+          const decimals = Number(token.token?.decimals ?? getAssetDecimals(token.token?.symbol));
+          const normalizedBalance = formatTokenBalance(BigInt(token.value ?? '0'), Number.isFinite(decimals) ? decimals : getAssetDecimals(token.token?.symbol));
           const symbol = token.token?.symbol ?? 'TOKEN';
           return {
             key: token.token?.address_hash ?? symbol,
             symbol,
             balance: normalizedBalance,
-            decimals: Number.isFinite(decimals) ? decimals : 18,
+            decimals: Number.isFinite(decimals) ? decimals : getAssetDecimals(symbol),
           };
         })
         .filter((asset) => Number(asset.balance) > 0);
@@ -204,6 +445,33 @@ function App() {
     }
   };
 
+  const refreshTransactionHistory = async (currentWallet?: ArcWallet | null) => {
+    const targetWallet = currentWallet ?? wallet;
+    if (!targetWallet) return;
+    setIsHistoryLoading(true);
+    setHistoryError(null);
+
+    try {
+      const nextTransactions = await fetchTransactionHistory(targetWallet.address);
+      setTransactions(nextTransactions);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : 'Unable to fetch transaction history.');
+      setTransactions([]);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  const refreshWalletData = async (currentWallet?: ArcWallet | null) => {
+    const targetWallet = currentWallet ?? wallet;
+    if (!targetWallet) return;
+
+    await Promise.all([
+      refreshBalance(targetWallet),
+      refreshTransactionHistory(targetWallet),
+    ]);
+  };
+
   const handleCreateWallet = async () => {
     try {
       setIsLoading(true);
@@ -214,7 +482,7 @@ function App() {
       setPrivateKey(privateKeyValue);
       setWallet(created);
       setImportInput('');
-      void refreshBalance(created);
+      void refreshWalletData(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Wallet creation failed.');
     } finally {
@@ -235,7 +503,7 @@ function App() {
       setPrivateKey(privateKeyValue);
       setWallet(imported);
       setImportInput('');
-      void refreshBalance(imported);
+      void refreshWalletData(imported);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Wallet import failed.');
     } finally {
@@ -252,6 +520,9 @@ function App() {
     setShowReceive(false);
     setShowSend(false);
     setShowRequest(false);
+    setShowHistory(false);
+    setTransactions([]);
+    setHistoryError(null);
     setTxHash(null);
     setTxState('idle');
   };
@@ -847,12 +1118,12 @@ function App() {
         <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
           <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
             <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Wallet actions</p>
-            <button onClick={() => void refreshBalance()} className="flex items-center gap-1 text-xs text-[#A1A1AA]">
+            <button onClick={() => void refreshWalletData()} className="flex items-center gap-1 text-xs text-[#A1A1AA]">
               <RefreshCcw className="h-3.5 w-3.5" />
               Refresh
             </button>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <button onClick={() => openSendModal()} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
               <Send className="h-4 w-4" />
               Send
@@ -864,6 +1135,10 @@ function App() {
             <button onClick={openRequestModal} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
               <QrCode className="h-4 w-4" />
               Request
+            </button>
+            <button onClick={() => setShowHistory(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <Clock className="h-4 w-4" />
+              History
             </button>
             <button onClick={() => setShowScanner(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
               <ScanLine className="h-4 w-4" />
@@ -910,6 +1185,92 @@ function App() {
 
         {copied ? <p className="text-center text-xs text-[#3B82F6]">Address copied</p> : null}
       </div>
+
+      {showHistory ? (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-2xl rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Transaction History</h3>
+              <div className="flex items-center gap-2">
+                <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]">
+                  <RefreshCcw className="h-3.5 w-3.5" />
+                  Refresh
+                </button>
+                <button onClick={() => setShowHistory(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {isHistoryLoading ? (
+                Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="flex items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#27272A]">
+                        <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-3 w-24 rounded-full bg-[#27272A]" />
+                        <div className="h-2.5 w-36 rounded-full bg-[#27272A]" />
+                      </div>
+                    </div>
+                    <div className="h-3 w-16 rounded-full bg-[#27272A]" />
+                  </div>
+                ))
+              ) : null}
+
+              {!isHistoryLoading && historyError ? (
+                <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">{historyError}</div>
+              ) : null}
+
+              {!isHistoryLoading && !historyError && transactions.length === 0 ? (
+                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-6 text-sm text-[#A1A1AA]">No transactions yet.</div>
+              ) : null}
+
+              {!isHistoryLoading && !historyError && transactions.length > 0 ? (
+                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  {transactions.map((transaction) => {
+                    const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
+                    const tokenDisplay = formatDisplayBalance(transaction.value);
+                    const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
+                    const directionIcon = transaction.direction === 'received' ? (
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <ArrowUpRight className="h-4 w-4 text-red-400" />
+                    );
+
+                    return (
+                      <button
+                        key={transaction.hash}
+                        onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-left transition hover:border-[#3B82F6]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
+                            {directionIcon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-[#FAFAFA]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                            <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
+                            <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <p className="text-sm font-semibold text-[#FAFAFA]">
+                            {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
+                          </p>
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
+                            {statusDisplay.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showReceive ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
