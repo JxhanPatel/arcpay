@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
-import { Camera, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, ScanLine, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
+import { Camera, CheckCircle2, ChevronDown, ChevronUp, Copy, ExternalLink, Lock, RefreshCcw, ScanLine, Send, Wallet, Download, Upload, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import { buildRequestLink, filterNonZeroAssetBalances, formatDisplayBalance, formatTokenBalance } from './balance';
@@ -110,6 +110,8 @@ function App() {
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
   const [sendReview, setSendReview] = useState(false);
   const [sendRecipientError, setSendRecipientError] = useState('');
+  const [recipientCheckMessage, setRecipientCheckMessage] = useState<string | null>(null);
+  const [recipientResolutionStatus, setRecipientResolutionStatus] = useState<'idle' | 'checking' | 'resolved' | 'unsupported'>('idle');
   const [sendAmountError, setSendAmountError] = useState('');
   const [requestAssetKey, setRequestAssetKey] = useState('usdc');
   const [requestAmount, setRequestAmount] = useState('');
@@ -434,6 +436,35 @@ function App() {
     return buildRequestLink(wallet.address, requestAmount, requestNote);
   }, [requestAmount, requestNote, selectedRequestAsset, wallet]);
 
+  const looksLikeArcNameHandle = (value: string) => {
+    const input = String(value ?? '').trim();
+    return /^[a-z0-9][a-z0-9-]*\.arc$/i.test(input);
+  };
+
+  const sendTarget = resolvedSendAddress ?? sendAddress;
+
+  const handleCheckArcName = async () => {
+    const input = String(sendAddress ?? '').trim();
+    if (!looksLikeArcNameHandle(input)) {
+      return;
+    }
+
+    setRecipientCheckMessage(null);
+    setRecipientResolutionStatus('checking');
+    setIsResolvingArcName(true);
+
+    try {
+      const resolved = await resolveRecipientAddress(input);
+      setResolvedSendAddress(resolved);
+      setRecipientResolutionStatus('resolved');
+    } catch {
+      setResolvedSendAddress(null);
+      setRecipientResolutionStatus('unsupported');
+    } finally {
+      setIsResolvingArcName(false);
+    }
+  };
+
   const resolveRecipientAddress = async (value: string) => {
     const input = String(value).trim();
     if (!input) {
@@ -470,16 +501,20 @@ function App() {
     const input = String(value).trim();
     if (!input) {
       setSendRecipientError('Enter a recipient address or ArcName handle.');
+      setRecipientCheckMessage(null);
+      setRecipientResolutionStatus('idle');
       return false;
     }
 
     const looksLikeAddress = /^0x[a-fA-F0-9]{40}$/.test(input);
-    const looksLikeArcName = input.toLowerCase().endsWith('.arc');
+    const looksLikeArcName = looksLikeArcNameHandle(input);
 
     if (looksLikeAddress) {
       const checksum = ethers.getAddress(input);
       setSendRecipientError('');
       setResolvedSendAddress(checksum);
+      setRecipientCheckMessage(null);
+      setRecipientResolutionStatus('idle');
       setIsResolvingArcName(false);
       return true;
     }
@@ -487,12 +522,16 @@ function App() {
     if (looksLikeArcName) {
       setSendRecipientError('');
       setResolvedSendAddress(null);
+      setRecipientCheckMessage(null);
+      setRecipientResolutionStatus('idle');
       setIsResolvingArcName(false);
       return true;
     }
 
     setSendRecipientError('Enter a valid checksummed address or a handle ending in .arc.');
     setResolvedSendAddress(null);
+    setRecipientCheckMessage(null);
+    setRecipientResolutionStatus('idle');
     setIsResolvingArcName(false);
     return false;
   };
@@ -613,7 +652,8 @@ function App() {
     }
 
     try {
-      await resolveRecipientAddress(sendAddress);
+      const nextSendTarget = await resolveRecipientAddress(sendTarget);
+      setResolvedSendAddress(nextSendTarget);
     } catch (err) {
       setSendRecipientError(err instanceof Error ? err.message : 'Unable to resolve ArcName handle.');
       return;
@@ -1046,6 +1086,8 @@ function App() {
                 setSendAddress('');
                 setSendAmountError('');
                 setSendRecipientError('');
+                setRecipientCheckMessage(null);
+                setRecipientResolutionStatus('idle');
                 setResolvedSendAddress(null);
                 setScannedRequestNote('');
                 setIsResolvingArcName(false);
@@ -1065,17 +1107,11 @@ function App() {
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Recipient</span>
-                      <span className="break-all text-right text-[#FAFAFA]">{sendAddress}</span>
+                      <span className="break-all text-right text-[#FAFAFA]">{sendTarget}</span>
                     </div>
                     {isResolvingArcName ? (
                       <div className="mt-3 rounded-xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-xs text-[#93C5FD]">
                         Resolving ArcName handle…
-                      </div>
-                    ) : null}
-                    {resolvedSendAddress ? (
-                      <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
-                        <span>Resolved address</span>
-                        <span className="break-all text-right text-[#FAFAFA]">{resolvedSendAddress}</span>
                       </div>
                     ) : null}
                   </div>
@@ -1117,16 +1153,45 @@ function App() {
 
                   <label className="block text-sm text-[#A1A1AA]">
                     Recipient address or ArcName
-                    <input
-                      value={sendAddress}
-                      onChange={(e) => {
-                        setSendAddress(e.target.value);
-                        validateSendRecipient(e.target.value);
-                      }}
-                      className={`mt-2 w-full rounded-xl border bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}
-                      placeholder="0x... or name.arc"
-                    />
+                    <div className={`mt-2 flex items-center gap-2 rounded-xl border bg-[#0a0a0a] px-3 py-2 ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}>
+                      <input
+                        value={sendAddress}
+                        onChange={(e) => {
+                          setSendAddress(e.target.value);
+                          setResolvedSendAddress(null);
+                          setRecipientCheckMessage(null);
+                          setRecipientResolutionStatus('idle');
+                          validateSendRecipient(e.target.value);
+                        }}
+                        className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                        placeholder="0x... or name.arc"
+                      />
+                      {recipientResolutionStatus === 'resolved' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      ) : null}
+                      {looksLikeArcNameHandle(sendAddress) && recipientResolutionStatus !== 'resolved' ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleCheckArcName()}
+                          disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
+                          className="rounded-full border border-[#3B82F6]/40 bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#93C5FD] transition hover:border-[#3B82F6] disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
+                        </button>
+                      ) : null}
+                    </div>
                     {sendRecipientError ? <p className="mt-2 text-xs text-red-400">{sendRecipientError}</p> : null}
+                    {recipientResolutionStatus === 'resolved' && resolvedSendAddress ? (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Resolved to {resolvedSendAddress.slice(0, 6)}...{resolvedSendAddress.slice(-4)}
+                      </p>
+                    ) : null}
+                    {recipientResolutionStatus === 'unsupported' ? (
+                      <p className="mt-2 text-xs text-[#A1A1AA]">
+                        This name isn't resolvable yet — enter a 0x address instead.
+                      </p>
+                    ) : null}
                     {isResolvingArcName ? (
                       <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
