@@ -40,9 +40,56 @@ const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
 const EXPLORER_URL = 'https://testnet.arcscan.app';
 const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
+export const ERC20_TRANSFER_ABI = ['function transfer(address to, uint256 amount) returns (bool)'];
 const ASSET_ICON_URLS: Record<string, string> = {
   USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
   EURC: 'https://orbmarkets.io/api/icons/euroCoin.png',
+};
+
+export type SendAssetPlan =
+  | {
+      kind: 'native';
+      tx: {
+        to: string;
+        value: bigint;
+      };
+    }
+  | {
+      kind: 'token';
+      tokenAddress: string;
+      abi: string[];
+      args: [string, bigint];
+    };
+
+export const buildSendTransactionPlan = (
+  selectedSendAsset: { key: string; symbol: string; balance: string; decimals?: number },
+  resolvedRecipient: string,
+  sendAmount: string,
+): SendAssetPlan => {
+  const decimals = selectedSendAsset.decimals ?? 6;
+  const value = ethers.parseUnits(sendAmount, decimals);
+
+  if (selectedSendAsset.symbol === 'USDC') {
+    return {
+      kind: 'native',
+      tx: {
+        to: resolvedRecipient,
+        value,
+      },
+    };
+  }
+
+  const tokenAddress = selectedSendAsset.key;
+  if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
+    throw new Error(`Unable to determine the ${selectedSendAsset.symbol} contract address.`);
+  }
+
+  return {
+    kind: 'token',
+    tokenAddress,
+    abi: ERC20_TRANSFER_ABI,
+    args: [resolvedRecipient, value],
+  };
 };
 
 const isValidPrivateKey = (input: string) => {
@@ -949,13 +996,17 @@ function App() {
 
     try {
       const resolvedRecipient = await resolveRecipientAddress(sendAddress);
-      const value = ethers.parseUnits(sendAmount, selectedSendAssetDecimals);
-      const tx = {
-        to: resolvedRecipient,
-        value,
-      };
-      const response = await wallet.sendTransaction(tx);
-      setTxHash(response.hash);
+      const plan = buildSendTransactionPlan(selectedSendAsset, resolvedRecipient, sendAmount);
+
+      if (plan.kind === 'native') {
+        const response = await wallet.sendTransaction(plan.tx);
+        setTxHash(response.hash);
+      } else {
+        const tokenContract = new ethers.Contract(plan.tokenAddress, plan.abi, wallet);
+        const response = await tokenContract.transfer(...plan.args);
+        setTxHash(response.hash);
+      }
+
       setTxState('success');
       setSendReview(false);
     } catch (err) {
