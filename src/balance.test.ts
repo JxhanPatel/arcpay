@@ -84,6 +84,29 @@ describe('getTransactionDisplayMeta', () => {
     expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('2.5');
     expect(meta.symbol).not.toBe('USDC');
   });
+
+  it('falls back to the root transaction value when the explorer reports a zero token transfer total', () => {
+    const tokenTx = {
+      value: '100000',
+      token: null,
+      token_transfers: [
+        {
+          value: '0',
+          total: { value: '0' },
+          token: {
+            symbol: 'USDC',
+            decimals: 6,
+          },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(tokenTx as Record<string, unknown>);
+
+    expect(meta.symbol).toBe('USDC');
+    expect(meta.decimals).toBe(6);
+    expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('0.1');
+  });
 });
 
 describe('buildRequestLink', () => {

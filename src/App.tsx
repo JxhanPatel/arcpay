@@ -1601,7 +1601,7 @@ function App() {
                     ) : null}
                     {recipientResolutionStatus === 'unsupported' ? (
                       <p className="mt-2 text-xs text-[#A1A1AA]">
-                        This name isn't resolvable yet — enter a 0x address instead.
+                        This name isn't resolvable yet: enter a 0x address instead.
                       </p>
                     ) : null}
                     {isResolvingArcName ? (

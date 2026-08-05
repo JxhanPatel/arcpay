@@ -86,13 +86,22 @@ export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) 
       ?? tokenPayload?.decimals
       ?? getAssetDecimals(transferSymbol),
   );
+  const transferValueCandidates = [
+    firstTransferTotal?.value,
+    firstTransfer?.value,
+    transactionTotal?.value,
+    transaction.amount,
+    transaction.value,
+  ];
   const transferValue = String(
-    firstTransferTotal?.value
-      ?? firstTransfer?.value
-      ?? transactionTotal?.value
-      ?? transaction.amount
-      ?? transaction.value
-      ?? '0',
+    transferValueCandidates.find((candidate) => {
+      const normalized = String(candidate ?? '').trim();
+      if (!normalized) {
+        return false;
+      }
+
+      return toBigInt(normalized) !== 0n;
+    }) ?? '0',
   );
   const rawValue = toBigInt(transferValue);
   const normalizedAmount = Number(formatTokenBalance(rawValue, Number.isFinite(transferDecimals) ? transferDecimals : getAssetDecimals(transferSymbol)));
