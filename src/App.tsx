@@ -413,6 +413,7 @@ function App() {
   const [sendAmount, setSendAmount] = useState('');
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
   const [sendReview, setSendReview] = useState(false);
+  const [selectedAssetDetail, setSelectedAssetDetail] = useState<string | null>(null);
   const [sendRecipientError, setSendRecipientError] = useState('');
   const [recipientCheckMessage, setRecipientCheckMessage] = useState<string | null>(null);
   const [recipientResolutionStatus, setRecipientResolutionStatus] = useState<'idle' | 'checking' | 'resolved' | 'unsupported'>('idle');
@@ -421,8 +422,10 @@ function App() {
   const [requestAmount, setRequestAmount] = useState('');
   const [requestNote, setRequestNote] = useState('');
   const [requestAmountError, setRequestAmountError] = useState('');
-  const [txState, setTxState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [txState, setTxState] = useState<'idle' | 'pending' | 'confirming' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [txConfirmationTimedOut, setTxConfirmationTimedOut] = useState(false);
+  const [txErrorDetail, setTxErrorDetail] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [assetBalances, setAssetBalances] = useState<Array<{ key: string; symbol: string; balance: string; decimals: number }>>([
     { key: 'usdc', symbol: 'USDC', balance, decimals: 6 },
@@ -596,14 +599,13 @@ function App() {
     setTxState('idle');
   };
 
-  const openSendModal = (scanDetails?: { recipient?: string; amount?: string; note?: string }) => {
-    const defaultAsset = [
-      ...tokenAssets,
-      ...assetBalances,
-    ].find((asset) => asset.symbol === 'USDC') ?? [
-      ...tokenAssets,
-      ...assetBalances,
-    ].find((asset) => Number(asset.balance) > 0) ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+  const openSendModal = (scanDetails?: { recipient?: string; amount?: string; note?: string; presetAssetKey?: string }) => {
+    const allAssets = [...tokenAssets, ...assetBalances];
+    const presetKey = scanDetails?.presetAssetKey;
+    const defaultAsset = (presetKey ? allAssets.find((asset) => asset.key === presetKey) : null)
+      ?? allAssets.find((asset) => asset.symbol === 'USDC')
+      ?? allAssets.find((asset) => Number(asset.balance) > 0)
+      ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
 
     setSendAssetKey(defaultAsset.key);
     setSendAddress(scanDetails?.recipient ?? '');
@@ -1097,29 +1099,80 @@ function App() {
     setTxState('pending');
     setError(null);
     setTxHash(null);
+    setTxConfirmationTimedOut(false);
+    setTxErrorDetail(null);
 
     try {
       const resolvedRecipient = await resolveRecipientAddress(sendAddress);
       const plan = buildSendTransactionPlan(selectedSendAsset, resolvedRecipient, sendAmount);
 
+      let txHashValue: string;
       if (plan.kind === 'native') {
         const response = await wallet.sendTransaction(plan.tx);
-        setTxHash(response.hash);
+        txHashValue = response.hash;
+        setTxHash(txHashValue);
       } else {
         const tokenContract = new ethers.Contract(plan.tokenAddress, plan.abi, wallet);
         const response = await tokenContract.transfer(...plan.args);
-        setTxHash(response.hash);
+        txHashValue = response.hash;
+        setTxHash(txHashValue);
       }
 
-      setTxState('success');
+      // Move to 'confirming' state immediately so UI shows hash + spinner
+      setTxState('confirming');
       setSendReview(false);
 
+      // Save contact in background
       setContacts((current) => {
         const isSaved = current.some((contact) => contact.address.toLowerCase() === resolvedRecipient.toLowerCase());
         return isSaved ? current : saveContact(resolvedRecipient);
       });
+
+      // Poll for confirmation with 120s timeout
+      const CONFIRMATION_TIMEOUT_MS = 120_000;
+      let confirmationTimedOut = false;
+      const timeoutId = window.setTimeout(() => {
+        confirmationTimedOut = true;
+        setTxConfirmationTimedOut(true);
+      }, CONFIRMATION_TIMEOUT_MS);
+
+      try {
+        const receipt = await provider.waitForTransaction(txHashValue);
+        window.clearTimeout(timeoutId);
+
+        if (confirmationTimedOut) {
+          // Timed out but we still got a receipt — check its status
+          if (receipt?.status === 1) {
+            setTxState('success');
+            void refreshTransactionHistory();
+          } else if (receipt?.status === 0) {
+            setTxState('error');
+            setTxErrorDetail('Transaction reverted on-chain.');
+          } else {
+            // Receipt without clear status after timeout — leave in confirming with timed-out flag
+            setTxState('confirming');
+          }
+        } else if (receipt?.status === 1) {
+          setTxState('success');
+          void refreshTransactionHistory();
+        } else if (receipt?.status === 0) {
+          setTxState('error');
+          setTxErrorDetail('Transaction reverted on-chain.');
+          void refreshTransactionHistory();
+        } else {
+          // No receipt or unknown status
+          setTxState('confirming');
+          setTxConfirmationTimedOut(true);
+        }
+      } catch (waitErr) {
+        window.clearTimeout(timeoutId);
+        // If waitForTransaction itself throws (e.g. network error), treat as timeout-like
+        setTxState('confirming');
+        setTxConfirmationTimedOut(true);
+      }
     } catch (err) {
       setTxState('error');
+      setTxErrorDetail(err instanceof Error ? err.message : 'Transaction failed.');
       setError(err instanceof Error ? err.message : 'Transaction failed.');
     }
   };
@@ -1141,6 +1194,12 @@ function App() {
   useEffect(() => {
     setAssetBalances((current) => current.map((asset) => (asset.key === 'usdc' ? { ...asset, balance } : asset)));
   }, [balance]);
+
+  useEffect(() => {
+    if (selectedAssetDetail && transactions.length === 0 && !isHistoryLoading) {
+      void refreshTransactionHistory();
+    }
+  }, [selectedAssetDetail]);
 
   if (!wallet) {
     return (
@@ -1322,7 +1381,12 @@ function App() {
           {visibleAssets.length > 0 ? (
             <div className="space-y-3">
               {visibleAssets.map((asset) => (
-                <div key={asset.key} className="flex items-center justify-between gap-3 border-b border-[#27272A] pb-3 last:border-b-0 last:pb-0">
+                <button
+                  key={asset.key}
+                  type="button"
+                  onClick={() => setSelectedAssetDetail(asset.key)}
+                  className="flex w-full items-center justify-between gap-3 border-b border-[#27272A] pb-3 last:border-b-0 last:pb-0 text-left transition hover:border-[#3B82F6]/40"
+                >
                   <div className="flex items-center gap-3">
                     <img
                       src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
@@ -1341,8 +1405,11 @@ function App() {
                       <p className="text-xs text-[#A1A1AA]">Available balance</p>
                     </div>
                   </div>
-                  <p className="text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
+                    <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
+                  </div>
+                </button>
               ))}
             </div>
           ) : (
@@ -1352,6 +1419,124 @@ function App() {
 
         {copied ? <p className="text-center text-xs text-[#3B82F6]">Address copied</p> : null}
       </div>
+
+      {selectedAssetDetail ? (() => {
+        const detailAsset = visibleAssets.find((a) => a.key === selectedAssetDetail)
+          ?? { key: selectedAssetDetail, symbol: 'TOKEN', balance: '0', decimals: 6 };
+        const assetTransactions = transactions.filter((tx) => tx.tokenSymbol === detailAsset.symbol);
+        const iconUrl = ASSET_ICON_URLS[detailAsset.symbol] ?? `https://cryptologos.cc/logos/${detailAsset.symbol.toLowerCase()}-${detailAsset.symbol.toLowerCase()}-logo.png`;
+
+        return (
+          <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+            <div className="w-full max-w-2xl rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={iconUrl}
+                    alt={`${detailAsset.symbol} icon`}
+                    className="h-10 w-10 rounded-full"
+                    onError={(event) => {
+                      event.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div>
+                    <h3 className="text-xl font-semibold">{detailAsset.symbol}</h3>
+                    <p className="text-xs text-[#A1A1AA]">Available: {detailAsset.balance}</p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedAssetDetail(null)} className="text-sm text-[#A1A1AA]">Close</button>
+              </div>
+
+              <div className="mt-5">
+                <button
+                  onClick={() => {
+                    const assetKey = selectedAssetDetail;
+                    setSelectedAssetDetail(null);
+                    openSendModal({ presetAssetKey: assetKey });
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]"
+                >
+                  <Send className="h-4 w-4" />
+                  Send {detailAsset.symbol}
+                </button>
+              </div>
+
+              <div className="mt-5">
+                <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-2">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Activity</p>
+                  <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition hover:text-[#FAFAFA]">
+                    <RefreshCcw className="h-3 w-3" />
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                  {isHistoryLoading && transactions.length === 0 ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="flex items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#27272A]">
+                            <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
+                          </div>
+                          <div className="space-y-2">
+                            <div className="h-3 w-24 rounded-full bg-[#27272A]" />
+                            <div className="h-2.5 w-36 rounded-full bg-[#27272A]" />
+                          </div>
+                        </div>
+                        <div className="h-3 w-16 rounded-full bg-[#27272A]" />
+                      </div>
+                    ))
+                  ) : null}
+
+                  {!isHistoryLoading && assetTransactions.length === 0 ? (
+                    <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-6 text-center text-sm text-[#A1A1AA]">
+                      No {detailAsset.symbol} transactions yet.
+                    </div>
+                  ) : null}
+
+                  {assetTransactions.map((transaction) => {
+                    const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
+                    const tokenDisplay = formatDisplayBalance(transaction.value);
+                    const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
+                    const directionIcon = transaction.direction === 'received' ? (
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <ArrowUpRight className="h-4 w-4 text-red-400" />
+                    );
+
+                    return (
+                      <button
+                        key={transaction.hash}
+                        onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-left transition hover:border-[#3B82F6]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
+                            {directionIcon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-[#FAFAFA]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                            <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
+                            <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <p className="text-sm font-semibold text-[#FAFAFA]">
+                            {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
+                          </p>
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
+                            {statusDisplay.label}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })() : null}
 
       {showHistory ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
@@ -2030,15 +2215,35 @@ function App() {
                 </>
               )}
 
+              {txState === 'confirming' && txHash ? (
+                <div className="rounded-2xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 p-3 text-sm text-[#93C5FD]">
+                  <div className="flex items-center gap-2">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    <p>{txConfirmationTimedOut ? 'Still confirming — check the explorer' : 'Confirming on-chain…'}</p>
+                  </div>
+                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#93C5FD]">
+                    View on explorer <ExternalLink className="h-4 w-4" />
+                  </a>
+                </div>
+              ) : null}
               {txState === 'success' && txHash ? (
                 <div className="rounded-2xl border border-emerald-700/40 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-                  <p>Transaction sent successfully.</p>
+                  <p>Transaction confirmed on-chain.</p>
                   <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-emerald-200">
                     View on explorer <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
               ) : null}
-              {txState === 'error' ? <p className="text-sm text-red-400">{error}</p> : null}
+              {txState === 'error' ? (
+                <div className="rounded-2xl border border-red-700/40 bg-red-500/10 p-3 text-sm text-red-300">
+                  <p>{txErrorDetail ?? error ?? 'Transaction failed.'}</p>
+                  {txHash ? (
+                    <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-red-200">
+                      View on explorer <ExternalLink className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
