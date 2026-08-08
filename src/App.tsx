@@ -6,6 +6,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Clock,
   Copy,
@@ -15,9 +16,11 @@ import {
   RefreshCcw,
   ScanLine,
   Send,
+  Settings,
+  Upload,
+  Users,
   Wallet,
   Download,
-  Upload,
   QrCode,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -31,6 +34,13 @@ import {
   getTransactionDisplayMeta,
   parseTransactionDirection,
 } from './balance';
+import {
+  type Contact,
+  formatContactLabel,
+  getContacts,
+  removeContact,
+  saveContact,
+} from './contacts';
 import { resolveArcName } from './utils/arcName';
 
 const STORAGE_KEY = 'arc_wallet_pk';
@@ -44,6 +54,8 @@ export const ERC20_TRANSFER_ABI = ['function transfer(address to, uint256 amount
 const ASSET_ICON_URLS: Record<string, string> = {
   USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
   EURC: 'https://orbmarkets.io/api/icons/euroCoin.png',
+  cirBTC: 'https://assets.coingecko.com/coins/images/102172745/standard/cirbtc.jpg',
+  CIRBTC: 'https://assets.coingecko.com/coins/images/102172745/standard/cirbtc.jpg',
 };
 
 export type SendAssetPlan =
@@ -390,6 +402,10 @@ function App() {
   const [showRequest, setShowRequest] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showContacts, setShowContacts] = useState(false);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>(getContacts());
   const [transactions, setTransactions] = useState<TransactionHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -418,6 +434,12 @@ function App() {
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerSuccess, setScannerSuccess] = useState(false);
   const [scannedRequestNote, setScannedRequestNote] = useState('');
+  const [contactLabelDraft, setContactLabelDraft] = useState('');
+  const [showContactLabelInput, setShowContactLabelInput] = useState(false);
+  const [addContactInput, setAddContactInput] = useState('');
+  const [addContactLabel, setAddContactLabel] = useState('');
+  const [addContactStatus, setAddContactStatus] = useState<'idle' | 'resolving'>('idle');
+  const [addContactError, setAddContactError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
@@ -602,6 +624,88 @@ function App() {
     await navigator.clipboard.writeText(wallet.address);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1300);
+  };
+
+  const getContactTargetAddress = () => {
+    const rawAddress = String(sendAddress ?? '').trim();
+    if (resolvedSendAddress) {
+      return resolvedSendAddress;
+    }
+
+    if (!/^0x[a-fA-F0-9]{40}$/.test(rawAddress)) {
+      return null;
+    }
+
+    try {
+      return ethers.getAddress(rawAddress);
+    } catch {
+      return null;
+    }
+  };
+
+  const refreshContactsState = () => {
+    setContacts(getContacts());
+  };
+
+  const handleSaveCurrentContact = () => {
+    const targetAddress = getContactTargetAddress();
+    if (!targetAddress) {
+      return;
+    }
+
+    const nextContacts = saveContact(targetAddress, contactLabelDraft);
+    setContacts(nextContacts);
+    setContactLabelDraft('');
+    setShowContactLabelInput(false);
+  };
+
+  const handleAddContact = async () => {
+    const input = addContactInput.trim();
+    const label = addContactLabel.trim();
+
+    if (!input) {
+      setAddContactError('Enter a valid address or ArcName handle.');
+      return;
+    }
+
+    if (addContactStatus === 'resolving') {
+      return;
+    }
+
+    if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
+      try {
+        const checksum = ethers.getAddress(input);
+        const nextContacts = saveContact(checksum, label || undefined);
+        setContacts(nextContacts);
+        setAddContactInput('');
+        setAddContactLabel('');
+        setAddContactError(null);
+        setAddContactStatus('idle');
+      } catch {
+        setAddContactError('Enter a valid 0x address.');
+      }
+      return;
+    }
+
+    if (!input.endsWith('.arc')) {
+      setAddContactError('Enter a valid 0x address or a handle ending in .arc.');
+      return;
+    }
+
+    setAddContactError(null);
+    setAddContactStatus('resolving');
+
+    try {
+      const resolvedAddress = await resolveArcName(input, provider);
+      const nextContacts = saveContact(resolvedAddress, label || undefined);
+      setContacts(nextContacts);
+      setAddContactInput('');
+      setAddContactLabel('');
+      setAddContactStatus('idle');
+    } catch (err) {
+      setAddContactError(err instanceof Error ? err.message : 'Unable to resolve ArcName handle.');
+      setAddContactStatus('idle');
+    }
   };
 
   const requestAssets = useMemo(() => {
@@ -1009,6 +1113,11 @@ function App() {
 
       setTxState('success');
       setSendReview(false);
+
+      setContacts((current) => {
+        const isSaved = current.some((contact) => contact.address.toLowerCase() === resolvedRecipient.toLowerCase());
+        return isSaved ? current : saveContact(resolvedRecipient);
+      });
     } catch (err) {
       setTxState('error');
       setError(err instanceof Error ? err.message : 'Transaction failed.');
@@ -1116,6 +1225,13 @@ function App() {
             >
               <span className="font-mono">{address.slice(0, 6)}...{address.slice(-4)}</span>
               <Copy className="h-3.5 w-3.5 text-[#A1A1AA]" />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]"
+              aria-label="Open settings"
+            >
+              <Settings className="h-4 w-4" />
             </button>
             <button
               onClick={handleLock}
@@ -1323,6 +1439,34 @@ function App() {
         </div>
       ) : null}
 
+      {showSettings ? (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Settings</h3>
+              <button onClick={() => setShowSettings(false)} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+            <div className="mt-6 space-y-3">
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowContacts(true);
+                }}
+                className="flex w-full items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] px-4 py-3 text-left text-[#FAFAFA] transition hover:border-[#3B82F6]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
+                    <Users className="h-4 w-4 text-[#93C5FD]" />
+                  </div>
+                  <span className="text-sm font-medium">Manage Contacts</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showReceive ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
@@ -1486,6 +1630,110 @@ function App() {
         </div>
       ) : null}
 
+      {showContacts ? (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Contacts</h3>
+              <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
+                <div className="space-y-3">
+                  <input
+                    value={addContactInput}
+                    onChange={(e) => {
+                      setAddContactInput(e.target.value);
+                      if (addContactError) {
+                        setAddContactError(null);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                    placeholder="0x... or name.arc"
+                  />
+                  <input
+                    value={addContactLabel}
+                    onChange={(e) => setAddContactLabel(e.target.value.trimStart())}
+                    className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                    placeholder="Label (optional)"
+                  />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleAddContact()}
+                      disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
+                      className="rounded-xl bg-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Add
+                    </button>
+                    {addContactStatus === 'resolving' ? (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
+                        Resolving…
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {addContactError ? <p className="text-xs text-red-400">{addContactError}</p> : null}
+                </div>
+              </div>
+
+              {contacts.length === 0 ? (
+                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
+                  No saved contacts yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {contacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSendAddress(contact.address);
+                          setResolvedSendAddress(contact.address);
+                          setRecipientCheckMessage(null);
+                          setRecipientResolutionStatus('idle');
+                          validateSendRecipient(contact.address);
+                          setShowContacts(false);
+                        }}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[11px] font-semibold text-[#93C5FD]">
+                          {formatContactLabel(contact)
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((part) => part[0]?.toUpperCase() ?? '')
+                            .join('') || contact.address.slice(2, 4).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
+                          <p className="truncate text-xs text-[#A1A1AA]">{contact.address}</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextContacts = removeContact(contact.address);
+                          setContacts(nextContacts);
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#27272A] bg-[#0a0a0a] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
+                        aria-label={`Delete ${formatContactLabel(contact)}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showSend ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
@@ -1493,6 +1741,9 @@ function App() {
               <h3 className="text-xl font-semibold">Send</h3>
               <button onClick={() => {
                 setShowSend(false);
+                setShowContacts(false);
+                setShowContactLabelInput(false);
+                setContactLabelDraft('');
                 setSendReview(false);
                 setSendAmount('');
                 setSendAddress('');
@@ -1564,34 +1815,160 @@ function App() {
                   ) : null}
 
                   <label className="block text-sm text-[#A1A1AA]">
-                    Recipient address or ArcName
-                    <div className={`mt-2 flex items-center gap-2 rounded-xl border bg-[#0a0a0a] px-3 py-2 ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}>
-                      <input
-                        value={sendAddress}
-                        onChange={(e) => {
-                          setSendAddress(e.target.value);
-                          setResolvedSendAddress(null);
-                          setRecipientCheckMessage(null);
-                          setRecipientResolutionStatus('idle');
-                          validateSendRecipient(e.target.value);
-                        }}
-                        className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
-                        placeholder="0x... or name.arc"
-                      />
-                      {recipientResolutionStatus === 'resolved' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      ) : null}
-                      {looksLikeArcNameHandle(sendAddress) && recipientResolutionStatus !== 'resolved' ? (
+                    <span className="mb-2 block">Recipient address or ArcName</span>
+
+                    {contacts.length > 0 ? (
+                      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                        {contacts.map((contact) => {
+                          const initials = formatContactLabel(contact)
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .map((part) => part[0]?.toUpperCase() ?? '')
+                            .join('') || contact.address.slice(2, 4).toUpperCase();
+
+                          return (
+                            <button
+                              key={contact.id}
+                              type="button"
+                              onClick={() => {
+                                setSendAddress(contact.address);
+                                setResolvedSendAddress(contact.address);
+                                setRecipientCheckMessage(null);
+                                setRecipientResolutionStatus('idle');
+                                validateSendRecipient(contact.address);
+                              }}
+                              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-2.5 py-1.5 text-left text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                            >
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[10px] font-semibold text-[#93C5FD]">
+                                {initials}
+                              </span>
+                              <span className="max-w-[9rem] truncate text-xs">{formatContactLabel(contact)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    <div className="relative mt-2">
+                      <div className={`flex items-center gap-2 rounded-xl border bg-[#0a0a0a] px-3 py-2 ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}>
+                        <input
+                          value={sendAddress}
+                          onChange={(e) => {
+                            setSendAddress(e.target.value);
+                            setResolvedSendAddress(null);
+                            setRecipientCheckMessage(null);
+                            setRecipientResolutionStatus('idle');
+                            setShowContactLabelInput(false);
+                            setContactLabelDraft('');
+                            setShowContactPicker(false);
+                            validateSendRecipient(e.target.value);
+                          }}
+                          className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                          placeholder="0x... or name.arc"
+                        />
                         <button
                           type="button"
-                          onClick={() => void handleCheckArcName()}
-                          disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
-                          className="rounded-full border border-[#3B82F6]/40 bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#93C5FD] transition hover:border-[#3B82F6] disabled:cursor-not-allowed disabled:opacity-70"
+                          onClick={() => setShowContactPicker((current) => !current)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-[#27272A] bg-[#121212] text-[#A1A1AA] transition hover:border-[#3B82F6] hover:text-[#FAFAFA]"
+                          aria-label="Open contacts"
                         >
-                          {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
+                          <Users className="h-4 w-4" />
                         </button>
+                        {recipientResolutionStatus === 'resolved' ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        ) : null}
+                        {recipientResolutionStatus === 'idle' && getContactTargetAddress() ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowContactLabelInput((current) => !current)}
+                            className="rounded-full border border-[#27272A] bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                          >
+                            Save
+                          </button>
+                        ) : null}
+                        {looksLikeArcNameHandle(sendAddress) && recipientResolutionStatus !== 'resolved' ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleCheckArcName()}
+                            disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
+                            className="rounded-full border border-[#3B82F6]/40 bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#93C5FD] transition hover:border-[#3B82F6] disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {showContactPicker ? (
+                        <div className="mt-2 rounded-2xl border border-[#27272A] bg-[#121212] p-2 shadow-[0_0_30px_rgba(0,0,0,0.25)]">
+                          {contacts.length === 0 ? (
+                            <div className="rounded-xl border border-[#27272A] bg-[#161616] px-3 py-3 text-xs text-[#A1A1AA]">
+                              No saved contacts yet.
+                            </div>
+                          ) : (
+                            <div className="max-h-48 space-y-2 overflow-y-auto">
+                              {contacts.map((contact) => (
+                                <button
+                                  key={contact.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSendAddress(contact.address);
+                                    setResolvedSendAddress(contact.address);
+                                    setRecipientCheckMessage(null);
+                                    setRecipientResolutionStatus('idle');
+                                    setShowContactPicker(false);
+                                    validateSendRecipient(contact.address);
+                                  }}
+                                  className="flex w-full items-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-3 py-2 text-left transition hover:border-[#3B82F6]"
+                                >
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[10px] font-semibold text-[#93C5FD]">
+                                    {formatContactLabel(contact)
+                                      .split(/\s+/)
+                                      .filter(Boolean)
+                                      .slice(0, 2)
+                                      .map((part) => part[0]?.toUpperCase() ?? '')
+                                      .join('') || contact.address.slice(2, 4).toUpperCase()}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
+                                    <p className="truncate text-[11px] text-[#A1A1AA]">{contact.address}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : null}
                     </div>
+
+                    {showContactLabelInput && getContactTargetAddress() ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          value={contactLabelDraft}
+                          onChange={(e) => setContactLabelDraft(e.target.value.slice(0, 40))}
+                          className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2 text-sm text-[#FAFAFA] outline-none"
+                          placeholder="Optional label"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveCurrentContact}
+                          className="rounded-xl bg-[#3B82F6] px-3 py-2 text-xs font-medium text-white"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowContactLabelInput(false);
+                            setContactLabelDraft('');
+                          }}
+                          className="text-xs text-[#A1A1AA]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+
                     {sendRecipientError ? <p className="mt-2 text-xs text-red-400">{sendRecipientError}</p> : null}
                     {recipientResolutionStatus === 'resolved' && resolvedSendAddress ? (
                       <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
