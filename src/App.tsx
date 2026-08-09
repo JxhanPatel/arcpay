@@ -32,6 +32,7 @@ import {
   formatTokenBalance,
   getAssetDecimals,
   getTransactionDisplayMeta,
+  isStableUsdPegged,
   parseTransactionDirection,
 } from './balance';
 import {
@@ -1185,6 +1186,9 @@ function App() {
   const totalPortfolioValue = useMemo(() => {
     return formatDisplayBalance(
       visibleAssets.reduce((total, asset) => {
+        if (!isStableUsdPegged(asset.symbol)) {
+          return total;
+        }
         const numericBalance = Number.parseFloat(asset.balance.replace(/,/g, ''));
         return total + (Number.isFinite(numericBalance) ? numericBalance : 0);
       }, 0),

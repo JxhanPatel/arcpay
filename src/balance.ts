@@ -26,10 +26,19 @@ const toBigInt = (value: unknown) => {
   return BigInt(rawValue);
 };
 
+export const isStableUsdPegged = (symbol?: string) => {
+  const normalized = String(symbol ?? '').toUpperCase();
+  return normalized === 'USDC' || normalized === 'EURC';
+};
+
 export const getAssetDecimals = (symbol?: string) => {
   const normalized = String(symbol ?? '').toUpperCase();
-  if (normalized === 'USDC' || normalized === 'EURC') {
+  if (isStableUsdPegged(symbol)) {
     return 6;
+  }
+
+  if (normalized === 'CIRBTC') {
+    return 8;
   }
 
   return 18;
@@ -142,9 +151,27 @@ export const formatDisplayBalance = (balance: string | number) => {
     return '0.00';
   }
 
+  if (numericValue === 0) {
+    return '0.00';
+  }
+
+  // For small nonzero balances, preserve enough precision to avoid rounding to zero.
+  // Use up to 8 decimal places, but at least 2.
+  const absValue = Math.abs(numericValue);
+  let fractionDigits = 2;
+  if (absValue > 0 && absValue < 0.01) {
+    // Find enough digits to show the first significant digit
+    const decimalStr = absValue.toFixed(8);
+    const match = decimalStr.match(/^0\.0*(\d)/);
+    if (match) {
+      const leadingZeros = match[0].length - 2; // subtract "0."
+      fractionDigits = Math.min(8, leadingZeros + 1);
+    }
+  }
+
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits: fractionDigits,
   }).format(numericValue);
 };
 

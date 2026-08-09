@@ -6,8 +6,10 @@ import {
   formatTokenBalance,
   getAssetDecimals,
   getTransactionDisplayMeta,
+  isStableUsdPegged,
   parseTransactionDirection,
 } from './balance';
+import cirBtcFixture from './__fixtures__/token-balance-cirbtc.json';
 
 describe('formatTokenBalance', () => {
   it('formats USDC balances from raw token units', () => {
@@ -41,6 +43,11 @@ describe('getAssetDecimals', () => {
     expect(getAssetDecimals('USDC')).toBe(6);
     expect(getAssetDecimals('EURC')).toBe(6);
     expect(getAssetDecimals('ARC')).toBe(18);
+  });
+
+  it('uses 8 decimals for cirBTC', () => {
+    expect(getAssetDecimals('cirBTC')).toBe(8);
+    expect(getAssetDecimals('CIRBTC')).toBe(8);
   });
 });
 
@@ -146,5 +153,85 @@ describe('filterNonZeroAssetBalances', () => {
       { key: 'arc', symbol: 'ARC', balance: '5' },
       { key: 'eurc', symbol: 'EURC', balance: '2' },
     ]);
+  });
+});
+
+describe('cirBTC balance from explorer fixture', () => {
+  it('correctly formats a small cirBTC balance without rounding to zero', () => {
+    const cirBtcEntry = cirBtcFixture.find(
+      (entry) => entry.token?.symbol === 'cirBTC',
+    );
+    expect(cirBtcEntry).toBeDefined();
+    expect(cirBtcEntry?.token?.decimals).toBe('8');
+    expect(cirBtcEntry?.value).toBe('20000');
+
+    const decimals = Number(cirBtcEntry?.token?.decimals ?? getAssetDecimals('cirBTC'));
+    const rawBalance = BigInt(cirBtcEntry?.value ?? '0');
+    const formattedBalance = formatTokenBalance(rawBalance, decimals);
+
+    expect(formattedBalance).toBe('0.0002');
+    expect(Number(formattedBalance)).toBeGreaterThan(0);
+  });
+
+  it('preserves precision when displaying small balances in the asset detail modal', () => {
+    const cirBtcEntry = cirBtcFixture.find(
+      (entry) => entry.token?.symbol === 'cirBTC',
+    );
+    expect(cirBtcEntry).toBeDefined();
+
+    const decimals = Number(cirBtcEntry?.token?.decimals ?? getAssetDecimals('cirBTC'));
+    const rawBalance = BigInt(cirBtcEntry?.value ?? '0');
+    const formattedBalance = formatTokenBalance(rawBalance, decimals);
+
+    // The display balance should NOT round to "0.00" for a nonzero balance
+    const displayBalance = formatDisplayBalance(formattedBalance);
+    expect(displayBalance).not.toBe('0.00');
+    expect(Number(displayBalance.replace(/,/g, ''))).toBeGreaterThan(0);
+  });
+});
+
+describe('portfolio value calculation with mixed assets', () => {
+  it('includes only stable USD-pegged assets (USDC, EURC) in total portfolio value', () => {
+    const mixedAssets = [
+      { key: 'usdc', symbol: 'USDC', balance: '38.894348', decimals: 6 },
+      { key: 'eurc', symbol: 'EURC', balance: '39.000000', decimals: 6 },
+      { key: 'cirbtc', symbol: 'cirBTC', balance: '0.0002', decimals: 8 },
+    ];
+
+    // Calculate portfolio value manually like App.tsx does
+    const portfolioValue = mixedAssets.reduce((total, asset) => {
+      if (!isStableUsdPegged(asset.symbol)) {
+        return total;
+      }
+      const numericBalance = Number.parseFloat(asset.balance.replace(/,/g, ''));
+      return total + (Number.isFinite(numericBalance) ? numericBalance : 0);
+    }, 0);
+
+    const formattedPortfolioValue = formatDisplayBalance(portfolioValue);
+    
+    // Should include USDC (38.89) + EURC (39.00) = 77.89
+    // Should exclude cirBTC (0.0002) since it's not USD-pegged
+    expect(formattedPortfolioValue).toBe('77.89');
+    expect(isStableUsdPegged('USDC')).toBe(true);
+    expect(isStableUsdPegged('EURC')).toBe(true);
+    expect(isStableUsdPegged('cirBTC')).toBe(false);
+  });
+
+  it('handles USDC/EURC-only wallets correctly (regression test)', () => {
+    const stableOnlyAssets = [
+      { key: 'usdc', symbol: 'USDC', balance: '50.00', decimals: 6 },
+      { key: 'eurc', symbol: 'EURC', balance: '25.50', decimals: 6 },
+    ];
+
+    const portfolioValue = stableOnlyAssets.reduce((total, asset) => {
+      if (!isStableUsdPegged(asset.symbol)) {
+        return total;
+      }
+      const numericBalance = Number.parseFloat(asset.balance.replace(/,/g, ''));
+      return total + (Number.isFinite(numericBalance) ? numericBalance : 0);
+    }, 0);
+
+    const formattedPortfolioValue = formatDisplayBalance(portfolioValue);
+    expect(formattedPortfolioValue).toBe('75.50');
   });
 });
