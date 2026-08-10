@@ -263,10 +263,11 @@ export const parseTokenBalances = (
     })
     .map((item) => {
       const token = isObjectRecord(item.token) ? item.token : {};
-      const decimals = Number(token.decimals ?? getAssetDecimals(token.symbol));
+      const rawSymbol = token.symbol;
+      const symbol = typeof rawSymbol === 'string' ? rawSymbol : 'TOKEN';
+      const decimals = Number(token.decimals ?? getAssetDecimals(symbol));
       const balance = toBigInt(item.value ?? '0');
-      const balanceFormatted = formatTokenBalance(balance, Number.isFinite(decimals) ? decimals : getAssetDecimals(token.symbol));
-      const symbol = token.symbol ?? 'TOKEN';
+      const balanceFormatted = formatTokenBalance(balance, Number.isFinite(decimals) ? decimals : getAssetDecimals(symbol));
       const tokenAddress = String(token.address_hash ?? symbol);
 
       return {

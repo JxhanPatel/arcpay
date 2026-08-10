@@ -502,6 +502,12 @@ function App() {
   const [createPinError, setCreatePinError] = useState<string | null>(null);
   const [pendingWalletData, setPendingWalletData] = useState<{ privateKey: string; wallet: ArcWallet } | null>(null);
 
+  // Seed phrase reveal state
+  const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
+  const [showMnemonicReveal, setShowMnemonicReveal] = useState(false);
+  const [hasConfirmedMnemonicSave, setHasConfirmedMnemonicSave] = useState(false);
+  const [copiedPhrase, setCopiedPhrase] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerLoopRef = useRef<number | null>(null);
@@ -690,9 +696,30 @@ function App() {
     }
   };
 
-  // Handle new wallet creation with PIN
+  // Handle new wallet creation - show mnemonic first, then PIN
   const handleCreateWallet = async () => {
-    setShowCreatePin(true);
+    setIsProcessing(true);
+    setError(null);
+    
+    try {
+      const created = ethers.Wallet.createRandom().connect(provider);
+      const privateKeyValue = created.privateKey;
+
+      // Extract mnemonic for new wallet creation
+      const mnemonic = created.mnemonic?.phrase;
+      if (mnemonic) {
+        setPendingMnemonic(mnemonic);
+        setShowMnemonicReveal(true);
+      }
+
+      // Store the wallet temporarily in state, but don't set it yet
+      // We'll set it after the user confirms the mnemonic and creates a PIN
+      setPendingWalletData({ privateKey: privateKeyValue, wallet: created });
+    } catch (err) {
+      setError('Wallet creation failed');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Finalize wallet creation after PIN is set
@@ -707,22 +734,28 @@ function App() {
       return;
     }
 
+    if (!pendingWalletData) {
+      setCreatePinError('No wallet data to finalize');
+      return;
+    }
+
     setIsProcessing(true);
     setCreatePinError(null);
 
     try {
-      const created = ethers.Wallet.createRandom().connect(provider);
-      const privateKeyValue = created.privateKey;
-
       // Encrypt immediately - never write plaintext to storage
-      const keystore = await encryptWallet(privateKeyValue, pin);
+      const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
       setKeystoreInStorage(keystore);
 
-      setWallet(created);
+      setWallet(pendingWalletData.wallet);
       setShowCreatePin(false);
       setCreatePin('');
       setCreatePinConfirm('');
-      void refreshWalletData(created);
+      setPendingWalletData(null);
+      // Clear mnemonic state as we're done with the creation flow
+      setPendingMnemonic(null);
+      setShowMnemonicReveal(false);
+      void refreshWalletData(pendingWalletData.wallet);
     } catch (err) {
       setCreatePinError('Wallet creation failed');
     } finally {
@@ -782,6 +815,9 @@ function App() {
       setCreatePin('');
       setCreatePinConfirm('');
       setPendingWalletData(null);
+      // Don't show mnemonic reveal for imported wallets
+      setPendingMnemonic(null);
+      setShowMnemonicReveal(false);
       void refreshWalletData(pendingWalletData.wallet);
     } catch (err) {
       setCreatePinError('Wallet import failed');
@@ -938,6 +974,17 @@ function App() {
       setAddContactError(err instanceof Error ? err.message : 'Unable to resolve ArcName handle.');
       setAddContactStatus('idle');
     }
+  };
+
+  const handleConfirmMnemonicSave = () => {
+    // Clear the mnemonic state and hide the reveal screen
+    setPendingMnemonic(null);
+    setShowMnemonicReveal(false);
+    // Show the PIN creation screen
+    setShowCreatePin(true);
+    setCreatePin('');
+    setCreatePinConfirm('');
+    setCreatePinError(null);
   };
 
   const requestAssets = useMemo(() => {
@@ -1493,6 +1540,91 @@ function App() {
     );
   }
 
+  // Mnemonic reveal screen - shown immediately after wallet creation
+  if (showMnemonicReveal && pendingMnemonic) {
+    const mnemonicWords = pendingMnemonic.split(' ');
+    
+    const copyMnemonic = async () => {
+      await navigator.clipboard.writeText(pendingMnemonic);
+      setCopiedPhrase(true);
+      window.setTimeout(() => setCopiedPhrase(false), 1300);
+    };
+
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
+              <Wallet className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Backup</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Save your recovery phrase</h1>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <p className="text-sm text-[#A1A1AA]">
+                This is your 12-word recovery phrase. Write it down and store it securely. This is the only way to recover your wallet if you lose access to this device.
+              </p>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {mnemonicWords.map((word, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center gap-2 rounded-lg border border-[#27272A] bg-[#161616] px-3 py-2 text-sm text-[#FAFAFA]"
+                  >
+                    <span className="text-[#A1A1AA] text-xs font-medium w-5">{index + 1}.</span>
+                    <span>{word}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={copyMnemonic}
+                  className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                >
+                  <Copy className="h-4 w-4" />
+                  {copiedPhrase ? 'Copied!' : 'Copy phrase'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="confirmMnemonic"
+                  checked={hasConfirmedMnemonicSave}
+                  onChange={(e) => setHasConfirmedMnemonicSave(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-[#27272A] bg-[#0a0a0a] text-[#3B82F6] focus:ring-[#3B82F6] focus:ring-offset-0"
+                />
+                <label htmlFor="confirmMnemonic" className="text-sm text-[#A1A1AA]">
+                  I have saved my recovery phrase somewhere safe.
+                </label>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmMnemonicSave}
+                disabled={!hasConfirmedMnemonicSave}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Migration screen - shown when legacy plaintext key exists
   if (isMigrating) {
     return (
@@ -1630,6 +1762,9 @@ function App() {
                 setCreatePinConfirm('');
                 setCreatePinError(null);
                 setPendingWalletData(null);
+                // Also clear mnemonic state if we're in the creation flow
+                setPendingMnemonic(null);
+                setShowMnemonicReveal(false);
                 setError('Wallet creation cancelled');
               }}
               className="w-full text-sm text-[#A1A1AA] hover:text-[#FAFAFA]"
@@ -1656,7 +1791,7 @@ function App() {
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Self-custodial</p>
-              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Arc Wallet</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Arc Wallet</h1>
             </div>
           </div>
 
@@ -2400,7 +2535,7 @@ function App() {
                       <span className="break-all text-right text-[#FAFAFA]">{sendTarget}</span>
                     </div>
                     {isResolvingArcName ? (
-                      <div className="mt-3 rounded-xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-xs text-[#93C5FD]">
+                      <div className="mt-3 rounded-xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-sm text-[#93C5FD]">
                         Resolving ArcName handle…
                       </div>
                     ) : null}
