@@ -22,6 +22,7 @@ import {
   Wallet,
   Download,
   QrCode,
+  Trash2,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { BrowserQRCodeReader } from '@zxing/browser';
@@ -43,8 +44,16 @@ import {
   saveContact,
 } from './contacts';
 import { resolveArcName } from './utils/arcName';
+import {
+  decryptWallet,
+  encryptWallet,
+  getKeystoreFromStorage,
+  hasLegacyKey,
+  removeKeystoreFromStorage,
+  setKeystoreInStorage,
+  STORAGE_KEY_LEGACY,
+} from './utils/walletStorage';
 
-const STORAGE_KEY = 'arc_wallet_pk';
 const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
 const ARC_CHAIN_ID = 5042002;
 const ARC_NETWORK_NAME = 'Arc Testnet';
@@ -391,6 +400,33 @@ const parseWalletInput = (input: string): ArcWallet => {
   throw new Error('Enter a valid 12-word seed phrase or a raw private key.');
 };
 
+// PIN Input component
+const PinInput = ({
+  value,
+  onChange,
+  placeholder = 'Enter PIN',
+  disabled = false,
+  error,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  error?: string | null;
+}) => (
+  <input
+    type="password"
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className={`w-full rounded-xl border bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none ${
+      error ? 'border-red-500' : 'border-[#27272A]'
+    }`}
+    placeholder={placeholder}
+    disabled={disabled}
+    maxLength={20}
+  />
+);
+
 function App() {
   const [privateKey, setPrivateKey] = useState<string | null>(null);
   const [wallet, setWallet] = useState<ArcWallet | null>(null);
@@ -445,6 +481,21 @@ function App() {
   const [addContactStatus, setAddContactStatus] = useState<'idle' | 'resolving'>('idle');
   const [addContactError, setAddContactError] = useState<string | null>(null);
 
+  // Wallet security state
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [unlockPin, setUnlockPin] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [migrationPin, setMigrationPin] = useState('');
+  const [migrationPinConfirm, setMigrationPinConfirm] = useState('');
+  const [migrationError, setMigrationError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showCreatePin, setShowCreatePin] = useState(false);
+  const [createPin, setCreatePin] = useState('');
+  const [createPinConfirm, setCreatePinConfirm] = useState('');
+  const [createPinError, setCreatePinError] = useState<string | null>(null);
+  const [pendingWalletData, setPendingWalletData] = useState<{ privateKey: string; wallet: ArcWallet } | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerLoopRef = useRef<number | null>(null);
@@ -452,20 +503,22 @@ function App() {
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
+  // Initialize wallet state on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = new ethers.Wallet(stored, provider);
-        setPrivateKey(stored);
-        setWallet(parsed);
-        void refreshWalletData(parsed);
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-        setPrivateKey(null);
-        setWallet(null);
-      }
+    // Check for keystore first (encrypted wallet)
+    const keystore = getKeystoreFromStorage();
+    if (keystore) {
+      setIsUnlocking(true);
+      return;
     }
+
+    // Check for legacy key (plaintext - needs migration)
+    if (hasLegacyKey()) {
+      setIsMigrating(true);
+      return;
+    }
+
+    // No wallet found, show create/import screen
   }, [provider]);
 
   const refreshBalance = async (currentWallet?: ArcWallet | null) => {
@@ -545,24 +598,115 @@ function App() {
     ]);
   };
 
-  const handleCreateWallet = async () => {
+  // Handle wallet unlock with PIN
+  const handleUnlock = async (pin: string) => {
+    setIsProcessing(true);
+    setUnlockError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
-      const created = ethers.Wallet.createRandom().connect(provider);
-      const privateKeyValue = created.privateKey;
-      localStorage.setItem(STORAGE_KEY, privateKeyValue);
-      setPrivateKey(privateKeyValue);
-      setWallet(created);
-      setImportInput('');
-      void refreshWalletData(created);
+      const keystore = getKeystoreFromStorage();
+      if (!keystore) {
+        throw new Error('Keystore not found');
+      }
+
+      const decryptedWallet = await decryptWallet(keystore, pin);
+      const connectedWallet = decryptedWallet.connect(provider);
+      setWallet(connectedWallet);
+      setIsUnlocking(false);
+      setUnlockPin('');
+      void refreshWalletData(connectedWallet);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Wallet creation failed.');
+      // Don't leak whether the keystore is malformed vs password is wrong
+      setUnlockError('Incorrect PIN or corrupted wallet');
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
+  // Handle migration from legacy plaintext key to encrypted keystore
+  const handleMigrate = async () => {
+    if (migrationPin.length < 6) {
+      setMigrationError('PIN must be at least 6 characters');
+      return;
+    }
+
+    if (migrationPin !== migrationPinConfirm) {
+      setMigrationError('PINs do not match');
+      return;
+    }
+
+    setIsProcessing(true);
+    setMigrationError(null);
+
+    try {
+      const legacyKey = localStorage.getItem(STORAGE_KEY_LEGACY);
+      if (!legacyKey) {
+        throw new Error('Legacy key not found');
+      }
+
+      // Create encrypted keystore
+      const keystore = await encryptWallet(legacyKey, migrationPin);
+      setKeystoreInStorage(keystore);
+
+      // Remove legacy key
+      localStorage.removeItem(STORAGE_KEY_LEGACY);
+
+      // Load the wallet
+      const decryptedWallet = await decryptWallet(keystore, migrationPin);
+      const connectedWallet = decryptedWallet.connect(provider);
+      setWallet(connectedWallet);
+      setIsMigrating(false);
+      setMigrationPin('');
+      setMigrationPinConfirm('');
+      void refreshWalletData(connectedWallet);
+    } catch (err) {
+      setMigrationError('Failed to secure wallet');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle new wallet creation with PIN
+  const handleCreateWallet = async () => {
+    setShowCreatePin(true);
+  };
+
+  // Finalize wallet creation after PIN is set
+  const finalizeCreateWallet = async (pin: string) => {
+    if (pin.length < 6) {
+      setCreatePinError('PIN must be at least 6 characters');
+      return;
+    }
+
+    if (pin !== createPinConfirm) {
+      setCreatePinError('PINs do not match');
+      return;
+    }
+
+    setIsProcessing(true);
+    setCreatePinError(null);
+
+    try {
+      const created = ethers.Wallet.createRandom().connect(provider);
+      const privateKeyValue = created.privateKey;
+
+      // Encrypt immediately - never write plaintext to storage
+      const keystore = await encryptWallet(privateKeyValue, pin);
+      setKeystoreInStorage(keystore);
+
+      setWallet(created);
+      setShowCreatePin(false);
+      setCreatePin('');
+      setCreatePinConfirm('');
+      void refreshWalletData(created);
+    } catch (err) {
+      setCreatePinError('Wallet creation failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle import wallet with PIN
   const handleImportWallet = async () => {
     try {
       setIsLoading(true);
@@ -572,11 +716,11 @@ function App() {
       }
       const imported = parseWalletInput(importInput).connect(provider);
       const privateKeyValue = imported.privateKey;
-      localStorage.setItem(STORAGE_KEY, privateKeyValue);
-      setPrivateKey(privateKeyValue);
-      setWallet(imported);
+
+      // Store temporarily in state, show PIN modal
+      setPendingWalletData({ privateKey: privateKeyValue, wallet: imported });
+      setShowCreatePin(true);
       setImportInput('');
-      void refreshWalletData(imported);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Wallet import failed.');
     } finally {
@@ -584,8 +728,46 @@ function App() {
     }
   };
 
+  // Finalize wallet import after PIN is set
+  const finalizeImportWallet = async (pin: string) => {
+    if (!pendingWalletData) {
+      setCreatePinError('No wallet data to import');
+      return;
+    }
+
+    if (pin.length < 6) {
+      setCreatePinError('PIN must be at least 6 characters');
+      return;
+    }
+
+    if (pin !== createPinConfirm) {
+      setCreatePinError('PINs do not match');
+      return;
+    }
+
+    setIsProcessing(true);
+    setCreatePinError(null);
+
+    try {
+      // Encrypt immediately - never write plaintext to storage
+      const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
+      setKeystoreInStorage(keystore);
+
+      setWallet(pendingWalletData.wallet);
+      setShowCreatePin(false);
+      setCreatePin('');
+      setCreatePinConfirm('');
+      setPendingWalletData(null);
+      void refreshWalletData(pendingWalletData.wallet);
+    } catch (err) {
+      setCreatePinError('Wallet import failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle lock - preserve keystore, just clear state
   const handleLock = () => {
-    localStorage.removeItem(STORAGE_KEY);
     setPrivateKey(null);
     setWallet(null);
     setBalance('0');
@@ -598,6 +780,29 @@ function App() {
     setHistoryError(null);
     setTxHash(null);
     setTxState('idle');
+    setIsUnlocking(true);
+  };
+
+  // Handle remove wallet - destructive action that clears keystore
+  const handleRemoveWallet = () => {
+    if (confirm('Are you sure you want to remove your wallet from this device? This cannot be undone. Make sure you have your seed phrase or private key backed up.')) {
+      removeKeystoreFromStorage();
+      localStorage.removeItem(STORAGE_KEY_LEGACY);
+      setPrivateKey(null);
+      setWallet(null);
+      setBalance('0');
+      setError(null);
+      setShowReceive(false);
+      setShowSend(false);
+      setShowRequest(false);
+      setShowHistory(false);
+      setTransactions([]);
+      setHistoryError(null);
+      setTxHash(null);
+      setTxState('idle');
+      setIsUnlocking(false);
+      setIsMigrating(false);
+    }
   };
 
   const openSendModal = (scanDetails?: { recipient?: string; amount?: string; note?: string; presetAssetKey?: string }) => {
@@ -1205,6 +1410,215 @@ function App() {
     }
   }, [selectedAssetDetail]);
 
+  // Unlock screen - shown when keystore exists
+  if (isUnlocking) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
+              <Lock className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Secure</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Unlock Wallet</h1>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm text-[#A1A1AA]">Enter your PIN</label>
+              <PinInput
+                value={unlockPin}
+                onChange={setUnlockPin}
+                placeholder="Enter PIN"
+                disabled={isProcessing}
+                error={unlockError}
+              />
+              {unlockError && <p className="mt-2 text-sm text-red-400">{unlockError}</p>}
+            </div>
+
+            <button
+              onClick={() => handleUnlock(unlockPin)}
+              disabled={isProcessing || unlockPin.length === 0}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+            >
+              {isProcessing ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Unlocking...
+                </>
+              ) : 'Unlock Wallet'}
+            </button>
+
+            <div className="text-center">
+              <button
+                onClick={handleRemoveWallet}
+                className="text-sm text-red-400 hover:text-red-300 flex items-center justify-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remove wallet from this device
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Migration screen - shown when legacy plaintext key exists
+  if (isMigrating) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
+              <Lock className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Security Upgrade</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Secure Your Wallet</h1>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <p className="text-sm text-[#A1A1AA]">
+              For enhanced security, your wallet is now protected by a PIN.
+              Please set a PIN to secure your wallet.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm text-[#A1A1AA]">Create PIN (min 6 characters)</label>
+                <PinInput
+                  value={migrationPin}
+                  onChange={setMigrationPin}
+                  placeholder="Create PIN"
+                  disabled={isProcessing}
+                  error={migrationError}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#A1A1AA]">Confirm PIN</label>
+                <PinInput
+                  value={migrationPinConfirm}
+                  onChange={setMigrationPinConfirm}
+                  placeholder="Confirm PIN"
+                  disabled={isProcessing}
+                  error={migrationError}
+                />
+              </div>
+
+              {migrationError && <p className="text-sm text-red-400">{migrationError}</p>}
+            </div>
+
+            <button
+              onClick={handleMigrate}
+              disabled={isProcessing || migrationPin.length === 0 || migrationPinConfirm.length === 0}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+            >
+              {isProcessing ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Securing...
+                </>
+              ) : 'Secure Wallet'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Create PIN modal for new wallet creation/import
+  if (showCreatePin) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
+              <Lock className="h-5 w-5 text-[#3B82F6]" />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Security</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Set PIN</h1>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <p className="text-sm text-[#A1A1AA]">
+              Create a PIN to protect your wallet. You will need this PIN to unlock your wallet on this device.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm text-[#A1A1AA]">Create PIN (min 6 characters)</label>
+                <PinInput
+                  value={createPin}
+                  onChange={setCreatePin}
+                  placeholder="Create PIN"
+                  disabled={isProcessing}
+                  error={createPinError}
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-[#A1A1AA]">Confirm PIN</label>
+                <PinInput
+                  value={createPinConfirm}
+                  onChange={setCreatePinConfirm}
+                  placeholder="Confirm PIN"
+                  disabled={isProcessing}
+                  error={createPinError}
+                />
+              </div>
+
+              {createPinError && <p className="text-sm text-red-400">{createPinError}</p>}
+            </div>
+
+            <button
+              onClick={() => pendingWalletData ? finalizeImportWallet(createPin) : finalizeCreateWallet(createPin)}
+              disabled={isProcessing || createPin.length === 0 || createPinConfirm.length === 0}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+            >
+              {isProcessing ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {pendingWalletData ? 'Importing...' : 'Creating...'}
+                </>
+              ) : pendingWalletData ? 'Import Wallet' : 'Create Wallet'}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowCreatePin(false);
+                setCreatePin('');
+                setCreatePinConfirm('');
+                setCreatePinError(null);
+                setPendingWalletData(null);
+                setError('Wallet creation cancelled');
+              }}
+              className="w-full text-sm text-[#A1A1AA] hover:text-[#FAFAFA]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No wallet - show create/import screen
   if (!wallet) {
     return (
       <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
@@ -1230,11 +1644,11 @@ function App() {
           <div className="space-y-3">
             <button
               onClick={handleCreateWallet}
-              disabled={isLoading}
+              disabled={isLoading || isProcessing}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB]"
             >
               <Download className="h-4 w-4" />
-              {isLoading ? 'Preparing…' : 'Create New Wallet'}
+              {isLoading || isProcessing ? 'Preparing…' : 'Create New Wallet'}
             </button>
 
             <div className="rounded-xl border border-[#27272A] bg-[#161616]/70 p-4">
@@ -1248,7 +1662,7 @@ function App() {
               />
               <button
                 onClick={handleImportWallet}
-                disabled={isLoading}
+                disabled={isLoading || isProcessing}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#121212] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
               >
                 <Upload className="h-4 w-4" />
