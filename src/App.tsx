@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import {
+  AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
   Camera,
@@ -448,6 +449,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>(getContacts());
   const [transactions, setTransactions] = useState<TransactionHistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -843,27 +845,7 @@ function App() {
     setIsUnlocking(true);
   };
 
-  // Handle remove wallet - destructive action that clears keystore
-  const handleRemoveWallet = () => {
-    if (confirm('Are you sure you want to remove your wallet from this device? This cannot be undone. Make sure you have your seed phrase or private key backed up.')) {
-      removeKeystoreFromStorage();
-      localStorage.removeItem(STORAGE_KEY_LEGACY);
-      setPrivateKey(null);
-      setWallet(null);
-      setBalance('0');
-      setError(null);
-      setShowReceive(false);
-      setShowSend(false);
-      setShowRequest(false);
-      setShowHistory(false);
-      setTransactions([]);
-      setHistoryError(null);
-      setTxHash(null);
-      setTxState('idle');
-      setIsUnlocking(false);
-      setIsMigrating(false);
-    }
-  };
+
 
   const openSendModal = (scanDetails?: { recipient?: string; amount?: string; note?: string; presetAssetKey?: string }) => {
     const allAssets = [...tokenAssets, ...assetBalances];
@@ -1524,16 +1506,6 @@ function App() {
                 </>
               ) : 'Unlock Wallet'}
             </button>
-
-            <div className="text-center">
-              <button
-                onClick={handleRemoveWallet}
-                className="text-sm text-red-400 hover:text-red-300 flex items-center justify-center gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Remove wallet from this device
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -2206,7 +2178,15 @@ function App() {
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Settings</h3>
-              <button onClick={() => setShowSettings(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              <button 
+                onClick={() => {
+                  setShowSettings(false);
+                  setConfirmRemoval(false);
+                }} 
+                className="text-sm text-[#A1A1AA]"
+              >
+                Close
+              </button>
             </div>
             <div className="mt-6 space-y-3">
               <button
@@ -2224,6 +2204,63 @@ function App() {
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
               </button>
+              
+              <div className="pt-4 border-t border-[#27272A]">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-red-400 mb-3">Danger Zone</p>
+                {!confirmRemoval ? (
+                  <button
+                    onClick={() => setConfirmRemoval(true)}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove wallet from this device
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                        <strong>Warning:</strong>
+                      </div>
+                      <p>This action will permanently delete your wallet from this device. Make sure you have your seed phrase or private key backed up securely.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          // Execute wallet removal
+                          removeKeystoreFromStorage();
+                          localStorage.removeItem(STORAGE_KEY_LEGACY);
+                          setPrivateKey(null);
+                          setWallet(null);
+                          setBalance('0');
+                          setError(null);
+                          setShowReceive(false);
+                          setShowSend(false);
+                          setShowRequest(false);
+                          setShowHistory(false);
+                          setShowSettings(false);
+                          setConfirmRemoval(false);
+                          setTransactions([]);
+                          setHistoryError(null);
+                          setTxHash(null);
+                          setTxState('idle');
+                          setIsUnlocking(false);
+                          setIsMigrating(false);
+                        }}
+                        className="flex-1 rounded-2xl bg-red-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-600"
+                      >
+                        Yes, remove wallet
+                      </button>
+                      <button
+                        onClick={() => setConfirmRemoval(false)}
+                        className="flex-1 rounded-2xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
