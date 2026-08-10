@@ -52,9 +52,9 @@ describe('getAssetDecimals', () => {
 });
 
 describe('getTransactionDisplayMeta', () => {
-  it('formats native transfers as USDC with 6 decimals instead of defaulting to ARC', () => {
+  it('formats native transfers as USDC with 18 decimals (EVM base units) instead of defaulting to ARC', () => {
     const nativeTx = {
-      value: '100000',
+      value: '100000000000000000',
       token: null,
       token_transfers: [],
     };
@@ -62,7 +62,7 @@ describe('getTransactionDisplayMeta', () => {
     const meta = getTransactionDisplayMeta(nativeTx as Record<string, unknown>);
 
     expect(meta.symbol).toBe('USDC');
-    expect(meta.decimals).toBe(6);
+    expect(meta.decimals).toBe(18);
     expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('0.1');
     expect(formatDisplayBalance(formatTokenBalance(meta.rawValue, meta.decimals))).toBe('0.10');
     expect(meta.symbol).not.toBe('ARC');

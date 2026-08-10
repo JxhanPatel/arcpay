@@ -16,7 +16,7 @@ describe('buildSendTransactionPlan', () => {
     }
     expect(plan.tx).toEqual({
       to: '0x1111111111111111111111111111111111111111',
-      value: ethers.parseUnits('1.5', 6),
+      value: ethers.parseUnits('1.5', 18),
     });
   });
 

@@ -78,7 +78,7 @@ export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) 
     const rawValue = toBigInt(nativeValue);
     return {
       symbol: 'USDC',
-      decimals: 6,
+      decimals: 18,
       rawValue,
     };
   }

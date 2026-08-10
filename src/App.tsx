@@ -60,6 +60,7 @@ const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
 const EXPLORER_URL = 'https://testnet.arcscan.app';
 const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
+const NATIVE_VALUE_DECIMALS = 18;
 export const ERC20_TRANSFER_ABI = ['function transfer(address to, uint256 amount) returns (bool)'];
 const ASSET_ICON_URLS: Record<string, string> = {
   USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
@@ -88,10 +89,9 @@ export const buildSendTransactionPlan = (
   resolvedRecipient: string,
   sendAmount: string,
 ): SendAssetPlan => {
-  const decimals = selectedSendAsset.decimals ?? 6;
-  const value = ethers.parseUnits(sendAmount, decimals);
-
   if (selectedSendAsset.symbol === 'USDC') {
+    // Native value on Arc is always 18-decimal EVM base units, regardless of USDC's 6 display decimals.
+    const value = ethers.parseUnits(sendAmount, NATIVE_VALUE_DECIMALS);
     return {
       kind: 'native',
       tx: {
@@ -100,6 +100,10 @@ export const buildSendTransactionPlan = (
       },
     };
   }
+
+  // ERC-20 token transfers use the token's own decimals (e.g. 6 for EURC).
+  const decimals = selectedSendAsset.decimals ?? 6;
+  const value = ethers.parseUnits(sendAmount, decimals);
 
   const tokenAddress = selectedSendAsset.key;
   if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
