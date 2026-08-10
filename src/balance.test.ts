@@ -7,6 +7,8 @@ import {
   getAssetDecimals,
   getTransactionDisplayMeta,
   isStableUsdPegged,
+  parseNativeBalance,
+  parseTokenBalances,
   parseTransactionDirection,
 } from './balance';
 import cirBtcFixture from './__fixtures__/token-balance-cirbtc.json';
@@ -233,5 +235,52 @@ describe('portfolio value calculation with mixed assets', () => {
 
     const formattedPortfolioValue = formatDisplayBalance(portfolioValue);
     expect(formattedPortfolioValue).toBe('75.50');
+  });
+});
+
+describe('parseNativeBalance', () => {
+  it('parses native USDC balance from address endpoint at 18 decimals', () => {
+    const fixture = {
+      "block_number_balance_updated_at": 56265081,
+      "coin_balance": "35360050196662244098162422",
+      "hash": "0xD4c0B787aA2ff9Eb751Bb515c877EbBF2Daddaae",
+    };
+
+    const result = parseNativeBalance(fixture, '0xD4c0B787aA2ff9Eb751Bb515c877EbBF2Daddaae');
+
+    expect(result).toEqual({
+      address: '0xD4c0B787aA2ff9Eb751Bb515c877EbBF2Daddaae',
+      coinBalance: 35360050196662244098162422n,
+      coinBalanceFormatted: '35360050.196662244098162422',
+      decimals: 18,
+      updatedAt: expect.any(Number),
+    });
+  });
+
+  it('confirms native balance is at 18 decimals vs USDC token at 6 decimals', () => {
+    // Native balance fixture (from address endpoint)
+    const nativeFixture = {
+      "coin_balance": "35360050196662244098162422", // 18 decimals
+    };
+    
+    // Token balance fixture (from token-balances endpoint)
+    const tokenFixture = [
+      {
+        "token": {
+          "symbol": "USDC",
+          "decimals": "6",
+        },
+        "value": "35359990191014", // 6 decimals
+      }
+    ];
+
+    const nativeResult = parseNativeBalance(nativeFixture, 'test');
+    const tokenResult = parseTokenBalances(tokenFixture, 'test');
+
+    expect(nativeResult?.coinBalanceFormatted).toBe('35360050.196662244098162422'); // 18 decimals
+    expect(tokenResult[0]?.balanceFormatted).toBe('35359990.191014'); // 6 decimals
+    
+    // These are different balances - native coin_balance vs USDC token balance
+    expect(nativeResult?.coinBalanceFormatted).not.toBe(tokenResult[0]?.balanceFormatted);
   });
 });

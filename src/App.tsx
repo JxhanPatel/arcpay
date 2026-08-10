@@ -34,6 +34,8 @@ import {
   getAssetDecimals,
   getTransactionDisplayMeta,
   isStableUsdPegged,
+  parseNativeBalance,
+  parseTokenBalances,
   parseTransactionDirection,
 } from './balance';
 import {
@@ -532,42 +534,60 @@ function App() {
     setError(null);
     try {
       const address = targetWallet.address;
-      const explorerResponse = await fetch(`${ARC_EXPLORER_API_URL}/addresses/${address}/token-balances`);
-      if (!explorerResponse.ok) {
+      
+      // Fetch both native balance and token balances in parallel
+      const [nativeResponse, tokenResponse] = await Promise.all([
+        fetch(`${ARC_EXPLORER_API_URL}/addresses/${address}`),
+        fetch(`${ARC_EXPLORER_API_URL}/addresses/${address}/token-balances`),
+      ]);
+
+      if (!nativeResponse.ok) {
+        throw new Error('Unable to fetch native balance from Arc explorer.');
+      }
+      if (!tokenResponse.ok) {
         throw new Error('Unable to fetch token balances from Arc explorer.');
       }
-      const tokens = (await explorerResponse.json()) as Array<{
-        token?: { symbol?: string; name?: string; decimals?: string; address_hash?: string };
-        value?: string;
-      }>;
 
-      const normalizedAssets = tokens
-        .filter((token) => token.token?.symbol && token.value)
-        .map((token) => {
-          const decimals = Number(token.token?.decimals ?? getAssetDecimals(token.token?.symbol));
-          const normalizedBalance = formatTokenBalance(BigInt(token.value ?? '0'), Number.isFinite(decimals) ? decimals : getAssetDecimals(token.token?.symbol));
-          const symbol = token.token?.symbol ?? 'TOKEN';
-          return {
-            key: token.token?.address_hash ?? symbol,
-            symbol,
-            balance: normalizedBalance,
-            decimals: Number.isFinite(decimals) ? decimals : getAssetDecimals(symbol),
-          };
-        })
-        .filter((asset) => Number(asset.balance) > 0);
+      const nativePayload = await nativeResponse.json();
+      const tokenPayload = await tokenResponse.json();
 
-      const usdcAsset = normalizedAssets.find((asset) => asset.symbol === 'USDC');
-      if (usdcAsset) {
-        setBalance(usdcAsset.balance);
-      } else {
-        setBalance('0');
-      }
+      // Parse native balance (18 decimals, USDC gas token)
+      const nativeBalance = parseNativeBalance(nativePayload, address);
+      const nativeUsdcBalance = nativeBalance?.coinBalanceFormatted ?? '0';
+
+      // Parse token balances (ERC-20 tokens)
+      const tokenBalances = parseTokenBalances(tokenPayload, address);
+      
+      // Normalize token balances to AssetBalance format
+      const normalizedAssets = tokenBalances
+        .filter((balance) => Number(balance.balanceFormatted) > 0)
+        .map((balance) => ({
+          key: balance.tokenAddress,
+          symbol: balance.symbol,
+          balance: balance.balanceFormatted,
+          decimals: balance.decimals,
+        }));
+
+      // Set the primary balance to native USDC (coin_balance)
+      // This is what funds sends and pays gas
+      setBalance(nativeUsdcBalance);
+      
+      // Store token assets separately
       setTokenAssets(normalizedAssets);
-      setAssetBalances(
-        normalizedAssets.length > 0
-          ? normalizedAssets
-          : [{ key: 'usdc', symbol: 'USDC', balance: usdcAsset?.balance ?? '0', decimals: 6 }],
-      );
+      
+      // Combine native USDC with token assets for asset balances display
+      // Native USDC should be first since it's the primary balance
+      const assetBalancesWithNative = [
+        {
+          key: 'native-usdc',
+          symbol: 'USDC',
+          balance: nativeUsdcBalance,
+          decimals: 18,
+        },
+        ...normalizedAssets.filter((asset) => asset.symbol !== 'USDC'),
+      ];
+
+      setAssetBalances(assetBalancesWithNative);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to fetch balance.');
     } finally {

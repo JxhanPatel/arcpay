@@ -5,6 +5,23 @@ export type AssetBalance = {
   decimals?: number;
 };
 
+export type NativeBalance = {
+  address: string;
+  coinBalance: bigint;
+  coinBalanceFormatted: string;
+  decimals: number;
+  updatedAt: number;
+};
+
+export type TokenBalance = {
+  address: string;
+  tokenAddress: string;
+  symbol: string;
+  balance: bigint;
+  balanceFormatted: string;
+  decimals: number;
+};
+
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
@@ -207,4 +224,58 @@ export const filterNonZeroAssetBalances = (assets: AssetBalance[]) => {
     }
     return 0;
   });
+};
+
+export const parseNativeBalance = (
+  payload: Record<string, unknown>,
+  address: string,
+): NativeBalance | null => {
+  const coinBalanceRaw = payload.coin_balance;
+  if (!coinBalanceRaw) {
+    return null;
+  }
+
+  const coinBalance = toBigInt(coinBalanceRaw);
+  const decimals = 18; // Native USDC on Arc uses 18 decimals
+  const coinBalanceFormatted = formatTokenBalance(coinBalance, decimals);
+
+  return {
+    address,
+    coinBalance,
+    coinBalanceFormatted,
+    decimals,
+    updatedAt: Date.now(),
+  };
+};
+
+export const parseTokenBalances = (
+  payload: Array<Record<string, unknown>>,
+  address: string,
+): TokenBalance[] => {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload
+    .filter((item) => {
+      const token = isObjectRecord(item.token) ? item.token : null;
+      return token?.symbol && item.value;
+    })
+    .map((item) => {
+      const token = isObjectRecord(item.token) ? item.token : {};
+      const decimals = Number(token.decimals ?? getAssetDecimals(token.symbol));
+      const balance = toBigInt(item.value ?? '0');
+      const balanceFormatted = formatTokenBalance(balance, Number.isFinite(decimals) ? decimals : getAssetDecimals(token.symbol));
+      const symbol = token.symbol ?? 'TOKEN';
+      const tokenAddress = String(token.address_hash ?? symbol);
+
+      return {
+        address,
+        tokenAddress,
+        symbol,
+        balance,
+        balanceFormatted,
+        decimals: Number.isFinite(decimals) ? decimals : getAssetDecimals(symbol),
+      };
+    });
 };
