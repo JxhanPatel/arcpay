@@ -25,6 +25,7 @@ import {
   QrCode,
   Trash2,
 } from 'lucide-react';
+import logoUrl from './assets/logo.png';
 import { QRCodeSVG } from 'qrcode.react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import {
@@ -1809,15 +1810,15 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] px-4 py-5 pb-28 sm:px-6 lg:px-8">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
       </div>
       <div className="relative mx-auto flex max-w-md flex-col gap-4">
         <header className="flex items-center justify-between border-b border-[#27272A] pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1F4ED8]/20 text-[#93C5FD]">
-              <Wallet className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#161616] p-1.5">
+              <img src={logoUrl} alt="ArcPay" className="h-full w-full object-contain" />
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Arc Network</p>
@@ -1835,13 +1836,6 @@ function App() {
               <Copy className="h-3.5 w-3.5 text-[#A1A1AA]" />
             </button>
             <button
-              onClick={() => setShowSettings(true)}
-              className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]"
-              aria-label="Open settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-            <button
               onClick={handleLock}
               className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]"
               aria-label="Lock wallet"
@@ -1851,20 +1845,29 @@ function App() {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Portfolio value</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight">${totalPortfolioValue} <span className="text-base font-medium text-[#A1A1AA]">USD</span></h2>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Portfolio value</p>
+              <h2 className="mt-2 font-mono text-3xl font-semibold tracking-tight">${totalPortfolioValue} <span className="text-base font-medium text-[#A1A1AA]">USD</span></h2>
               <p className="mt-2 text-xs text-[#A1A1AA]">{ARC_NETWORK_NAME} · Chain ID {ARC_CHAIN_ID}</p>
             </div>
-            <button
-              onClick={() => setShowAssetBreakdown((current) => !current)}
-              className="flex items-center gap-1 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-[11px] text-[#FAFAFA]"
-            >
-              {showAssetBreakdown ? 'Hide' : 'Assets'}
-              {showAssetBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => void refreshWalletData()}
+                className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-8 w-8"
+                aria-label="Refresh"
+              >
+                <RefreshCcw className="h-4 w-4 text-[#A1A1AA]" />
+              </button>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-8 w-8"
+                aria-label="History"
+              >
+                <Clock className="h-4 w-4 text-[#A1A1AA]" />
+              </button>
+            </div>
           </div>
 
           {showAssetBreakdown ? (
@@ -1883,48 +1886,36 @@ function App() {
                     }}
                   />
                   <span>{asset.symbol}</span>
-                  <span className="text-[#A1A1AA]">{asset.balance}</span>
+                  <span className="font-mono text-[#A1A1AA]">{asset.balance}</span>
                 </button>
               ))}
             </div>
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
           <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
-            <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Wallet actions</p>
-            <button onClick={() => void refreshWalletData()} className="flex items-center gap-1 text-xs text-[#A1A1AA]">
-              <RefreshCcw className="h-3.5 w-3.5" />
-              Refresh
-            </button>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Wallet actions</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            <button onClick={() => openSendModal()} className="flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]">
-              <Send className="h-4 w-4" />
+          <div className="flex flex-nowrap gap-1.5 overflow-x-auto">
+            <button onClick={() => openSendModal()} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#3B82F6] px-3 py-2 text-sm font-medium text-white transition hover:scale-105 hover:bg-[#2563EB] active:scale-95">
+              <Send className="h-3.5 w-3.5" />
               Send
             </button>
-            <button onClick={() => setShowReceive(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <Download className="h-4 w-4" />
+            <button onClick={() => setShowReceive(true)} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <Download className="h-3.5 w-3.5" />
               Receive
             </button>
-            <button onClick={openRequestModal} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <QrCode className="h-4 w-4" />
+            <button onClick={openRequestModal} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
+              <QrCode className="h-3.5 w-3.5" />
               Request
-            </button>
-            <button onClick={() => setShowHistory(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <Clock className="h-4 w-4" />
-              History
-            </button>
-            <button onClick={() => setShowScanner(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <ScanLine className="h-4 w-4" />
-              Scan
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[#27272A] bg-[#121212]/80 p-4">
+        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
           <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
-            <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Holdings</p>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Holdings</p>
             <span className="text-[11px] text-[#A1A1AA]">{visibleAssets.length} assets</span>
           </div>
           {visibleAssets.length > 0 ? (
@@ -1955,7 +1946,7 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
+                    <p className="font-mono text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
                     <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
                   </div>
                 </button>
@@ -2862,6 +2853,36 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {/* Bottom bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-10 h-20 border-t border-[#27272A] bg-[#0A0A0A] backdrop-blur-md">
+        <div className="relative mx-auto h-full max-w-md">
+          <div className="absolute left-1/2 top-0 flex -translate-x-1/2 items-center justify-between px-4 pt-3 w-64">
+            <button
+              onClick={() => setShowContacts(true)}
+              className="h-10 w-10 rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA] flex items-center justify-center"
+              aria-label="Contacts"
+            >
+              <Users className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="h-10 w-10 rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA] flex items-center justify-center"
+              aria-label="Settings"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
+          <button
+            onClick={() => setShowScanner(true)}
+            aria-label="Scan QR code"
+            className="absolute -top-8 left-1/2 flex h-16 w-16 -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-full border-4 border-[#050505] bg-[#3B82F6] text-white shadow-glow transition hover:scale-105 hover:bg-[#2563EB] active:scale-95"
+          >
+            <ScanLine className="h-5 w-5" />
+            <span className="text-[9px] font-medium">Scan</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
