@@ -468,6 +468,7 @@ function App() {
   const [requestAmount, setRequestAmount] = useState('');
   const [requestNote, setRequestNote] = useState('');
   const [requestAmountError, setRequestAmountError] = useState('');
+  const [requestLinkCopied, setRequestLinkCopied] = useState(false);
   const [txState, setTxState] = useState<'idle' | 'pending' | 'confirming' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txConfirmationTimedOut, setTxConfirmationTimedOut] = useState(false);
@@ -2289,6 +2290,7 @@ function App() {
                 setRequestAmount('');
                 setRequestNote('');
                 setRequestAmountError('');
+                setRequestLinkCopied(false);
               }} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
             <div className="mt-6 space-y-4">
@@ -2353,25 +2355,19 @@ function App() {
                     <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
                       <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
                     </div>
-                    <label className="w-full text-sm text-[#A1A1AA]">
-                      Deep link
-                      <input
-                        readOnly
-                        value={requestLink}
-                        className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
-                      />
-                    </label>
                     <button
                       onClick={async () => {
                         if (!requestLink) return;
                         await navigator.clipboard.writeText(requestLink);
                         setCopied(true);
+                        setRequestLinkCopied(true);
                         window.setTimeout(() => setCopied(false), 1300);
+                        window.setTimeout(() => setRequestLinkCopied(false), 1300);
                       }}
                       className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA]"
                     >
-                      <Copy className="h-4 w-4" />
-                      Copy request link
+                      {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                      {requestLinkCopied ? 'Copied' : 'Copy request link'}
                     </button>
                   </div>
                 </div>
