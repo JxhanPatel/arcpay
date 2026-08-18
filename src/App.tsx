@@ -24,6 +24,9 @@ import {
   Download,
   QrCode,
   Trash2,
+  Search,
+  Plus,
+  X,
 } from 'lucide-react';
 import logoUrl from './assets/logo.png';
 import { QRCodeSVG } from 'qrcode.react';
@@ -46,6 +49,7 @@ import {
   getContacts,
   removeContact,
   saveContact,
+  filterContacts,
 } from './contacts';
 import { resolveArcName } from './utils/arcName';
 import {
@@ -490,6 +494,8 @@ function App() {
   const [addContactLabel, setAddContactLabel] = useState('');
   const [addContactStatus, setAddContactStatus] = useState<'idle' | 'resolving'>('idle');
   const [addContactError, setAddContactError] = useState<string | null>(null);
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
 
   // Wallet security state
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -2421,100 +2427,135 @@ function App() {
           <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Contacts</h3>
-              <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsAddContactOpen(!isAddContactOpen)}
+                  className={`rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA] ${
+                    isAddContactOpen ? 'border-[#3B82F6] bg-[#3B82F6]/10' : ''
+                  }`}
+                  aria-label={isAddContactOpen ? 'Close add contact form' : 'Add contact'}
+                >
+                  {isAddContactOpen ? <X size={18} /> : <Plus size={18} />}
+                </button>
+                <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              </div>
             </div>
 
             <div className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
-                <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
-                <div className="space-y-3">
-                  <input
-                    value={addContactInput}
-                    onChange={(e) => {
-                      setAddContactInput(e.target.value);
-                      if (addContactError) {
-                        setAddContactError(null);
-                      }
-                    }}
-                    className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
-                    placeholder="0x... or name.arc"
-                  />
-                  <input
-                    value={addContactLabel}
-                    onChange={(e) => setAddContactLabel(e.target.value.trimStart())}
-                    className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
-                    placeholder="Label (optional)"
-                  />
+              {isAddContactOpen && (
+                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                  <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
+                  <div className="space-y-3">
+                    <input
+                      value={addContactInput}
+                      onChange={(e) => {
+                        setAddContactInput(e.target.value);
+                        if (addContactError) {
+                          setAddContactError(null);
+                        }
+                      }}
+                      className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                      placeholder="0x... or name.arc"
+                    />
+                    <input
+                      value={addContactLabel}
+                      onChange={(e) => setAddContactLabel(e.target.value.trimStart())}
+                      className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                      placeholder="Label (optional)"
+                    />
 
-                  <div className="flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleAddContact()}
-                      disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
-                      className="rounded-xl bg-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Add
-                    </button>
-                    {addContactStatus === 'resolving' ? (
-                      <div className="inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
-                        Resolving…
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {addContactError ? <p className="text-xs text-red-400">{addContactError}</p> : null}
-                </div>
-              </div>
-
-              {contacts.length === 0 ? (
-                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
-                  No saved contacts yet.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {contacts.map((contact) => (
-                    <div key={contact.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
+                    <div className="flex items-center justify-between gap-3">
                       <button
                         type="button"
                         onClick={() => {
-                          setSendAddress(contact.address);
-                          setResolvedSendAddress(contact.address);
-                          setRecipientCheckMessage(null);
-                          setRecipientResolutionStatus('idle');
-                          validateSendRecipient(contact.address);
-                          setShowContacts(false);
+                          void handleAddContact();
+                          // Auto-collapse form after successful submission
+                          if (!addContactError && addContactInput.trim() && addContactStatus !== 'resolving') {
+                            setIsAddContactOpen(false);
+                          }
                         }}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
+                        className="rounded-xl bg-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[11px] font-semibold text-[#93C5FD]">
-                          {formatContactLabel(contact)
-                            .split(/\s+/)
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((part) => part[0]?.toUpperCase() ?? '')
-                            .join('') || contact.address.slice(2, 4).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
-                          <p className="truncate text-xs text-[#A1A1AA]">{contact.address}</p>
-                        </div>
+                        Add
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextContacts = removeContact(contact.address);
-                          setContacts(nextContacts);
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#27272A] bg-[#0a0a0a] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
-                        aria-label={`Delete ${formatContactLabel(contact)}`}
-                      >
-                        ×
-                      </button>
+                      {addContactStatus === 'resolving' ? (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
+                          Resolving…
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
+
+                    {addContactError ? <p className="text-xs text-red-400">{addContactError}</p> : null}
+                  </div>
                 </div>
               )}
+
+              {/* Search bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A1A1AA]" />
+                <input
+                  type="text"
+                  value={contactSearchQuery}
+                  onChange={(e) => setContactSearchQuery(e.target.value)}
+                  placeholder="Search contacts..."
+                  className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] pl-10 pr-4 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                />
+              </div>
+
+              {/* Filtered contacts list */}
+              {(() => {
+                const filteredContacts = filterContacts(contacts, contactSearchQuery);
+                return filteredContacts.length === 0 ? (
+                  <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
+                    {contacts.length === 0 ? 'No saved contacts yet.' : 'No contacts match your search.'}
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {filteredContacts.map((contact) => (
+                      <div key={contact.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSendAddress(contact.address);
+                            setResolvedSendAddress(contact.address);
+                            setRecipientCheckMessage(null);
+                            setRecipientResolutionStatus('idle');
+                            validateSendRecipient(contact.address);
+                            setShowContacts(false);
+                          }}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        >
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[11px] font-semibold text-[#93C5FD]">
+                            {formatContactLabel(contact)
+                              .split(/\s+/)
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .map((part) => part[0]?.toUpperCase() ?? '')
+                              .join('') || contact.address.slice(2, 4).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
+                            <p className="truncate text-xs text-[#A1A1AA]">{contact.address}</p>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextContacts = removeContact(contact.address);
+                            setContacts(nextContacts);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#27272A] bg-[#0a0a0a] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
+                          aria-label={`Delete ${formatContactLabel(contact)}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

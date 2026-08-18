@@ -162,3 +162,18 @@ export const formatContactLabel = (contact: Contact): string => {
 
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
+
+export const filterContacts = (contacts: Contact[], query: string): Contact[] => {
+  const trimmedQuery = query.trim().toLowerCase();
+  
+  if (!trimmedQuery) {
+    return contacts;
+  }
+
+  return contacts.filter(contact => {
+    const label = contact.label?.toLowerCase() || '';
+    const address = contact.address?.toLowerCase() || '';
+    
+    return label.includes(trimmedQuery) || address.includes(trimmedQuery);
+  });
+};
