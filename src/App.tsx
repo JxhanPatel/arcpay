@@ -1852,70 +1852,56 @@ function App() {
           </div>
         </header>
 
-        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
+        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Portfolio value</p>
-              <h2 className="mt-2 font-mono text-3xl font-semibold tracking-tight">${totalPortfolioValue} <span className="text-base font-medium text-[#A1A1AA]">USD</span></h2>
-              <p className="mt-2 text-xs text-[#A1A1AA]">{ARC_NETWORK_NAME} · Chain ID {ARC_CHAIN_ID}</p>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Total balance</p>
+              <h2 className="mt-2 text-4xl font-bold tracking-tight">${totalPortfolioValue}</h2>
+              <p className="mt-2 text-xs text-[#A1A1AA]">Testnet · {ARC_NETWORK_NAME}</p>
+              {/* TODO: sparkline once portfolio history endpoint exists */}
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => void refreshWalletData()}
-                className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-8 w-8"
-                aria-label="Refresh"
-              >
-                <RefreshCcw className="h-4 w-4 text-[#A1A1AA]" />
-              </button>
-              <button
-                onClick={() => setShowHistory(true)}
-                className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-8 w-8"
-                aria-label="History"
-              >
-                <Clock className="h-4 w-4 text-[#A1A1AA]" />
-              </button>
-            </div>
+            <button
+              onClick={() => void refreshWalletData()}
+              className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-9 w-9 shrink-0"
+              aria-label="Refresh"
+            >
+              <RefreshCcw className="h-4 w-4 text-[#A1A1AA]" />
+            </button>
           </div>
-
-          {showAssetBreakdown ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {visibleAssets.map((asset) => (
-                <button
-                  key={asset.key}
-                  className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]"
-                >
-                  <img
-                    src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
-                    alt={`${asset.symbol} icon`}
-                    className="h-5 w-5 rounded-full"
-                    onError={(event) => {
-                      event.currentTarget.style.display = 'none';
-                    }}
-                  />
-                  <span>{asset.symbol}</span>
-                  <span className="font-mono text-[#A1A1AA]">{asset.balance}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
+          {/* showAssetBreakdown chip row removed — the holdings list below always shows the full asset list */}
         </section>
 
         <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
-          <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Wallet actions</p>
-          </div>
-          <div className="flex flex-nowrap gap-1.5 overflow-x-auto">
-            <button onClick={() => openSendModal()} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#3B82F6] px-3 py-2 text-sm font-medium text-white transition hover:scale-105 hover:bg-[#2563EB] active:scale-95">
-              <Send className="h-3.5 w-3.5" />
-              Send
+          <div className="grid grid-cols-5 gap-2">
+            <button onClick={() => openSendModal()} className="flex flex-col items-center gap-2">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
+                <Send className="h-5 w-5" />
+              </span>
+              <span className="text-xs text-[#A1A1AA]">Send</span>
             </button>
-            <button onClick={() => setShowReceive(true)} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <Download className="h-3.5 w-3.5" />
-              Receive
+            <button onClick={() => setShowReceive(true)} className="flex flex-col items-center gap-2">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
+                <Download className="h-5 w-5" />
+              </span>
+              <span className="text-xs text-[#A1A1AA]">Receive</span>
             </button>
-            <button onClick={openRequestModal} className="flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]">
-              <QrCode className="h-3.5 w-3.5" />
-              Request
+            <button onClick={openRequestModal} className="flex flex-col items-center gap-2">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
+                <QrCode className="h-5 w-5" />
+              </span>
+              <span className="text-xs text-[#A1A1AA]">Request</span>
+            </button>
+            <button onClick={() => setShowHistory(true)} className="flex flex-col items-center gap-2">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
+                <Clock className="h-5 w-5" />
+              </span>
+              <span className="text-xs text-[#A1A1AA]">History</span>
+            </button>
+            <button onClick={() => setShowScanner(true)} className="flex flex-col items-center gap-2">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
+                <ScanLine className="h-5 w-5" />
+              </span>
+              <span className="text-xs text-[#A1A1AA]">Scan</span>
             </button>
           </div>
         </section>
@@ -1926,30 +1912,31 @@ function App() {
             <span className="text-[11px] text-[#A1A1AA]">{visibleAssets.length} assets</span>
           </div>
           {visibleAssets.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-1">
               {visibleAssets.map((asset) => (
                 <button
                   key={asset.key}
                   type="button"
                   onClick={() => setSelectedAssetDetail(asset.key)}
-                  className="flex w-full items-center justify-between gap-3 border-b border-[#27272A] pb-3 last:border-b-0 last:pb-0 text-left transition hover:border-[#3B82F6]/40"
+                  className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition hover:bg-[#161616]"
                 >
                   <div className="flex items-center gap-3">
                     <img
                       src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
                       alt={`${asset.symbol} icon`}
-                      className="h-9 w-9 rounded-full"
+                      className="h-10 w-10 rounded-full"
                       onError={(event) => {
                         event.currentTarget.style.display = 'none';
                         const fallback = document.createElement('div');
-                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-[11px] font-semibold text-[#93C5FD]';
+                        fallback.className = 'flex h-10 w-10 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-[11px] font-semibold text-[#93C5FD]';
                         fallback.textContent = asset.symbol.slice(0, 2).toUpperCase();
                         event.currentTarget.parentElement?.appendChild(fallback);
                       }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-[#FAFAFA]">{asset.symbol}</p>
-                      <p className="text-xs text-[#A1A1AA]">Available balance</p>
+                      <p className="text-sm font-bold text-[#FAFAFA]">{asset.symbol}</p>
+                      {/* TODO: APY badge once yield data is available */}
+                      <p className="text-xs text-[#A1A1AA]">{asset.balance} available</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
