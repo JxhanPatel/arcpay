@@ -61,6 +61,21 @@ import {
   setKeystoreInStorage,
   STORAGE_KEY_LEGACY,
 } from './utils/walletStorage';
+import {
+  buildKeystoreKey,
+  deriveAccountAtIndex,
+  getActiveAccountIndex,
+  getKeystoreForAccount,
+  getNextDerivationIndex,
+  getStoredAccountsMeta,
+  removeAccount,
+  removeAllAccountData,
+  renameAccount,
+  saveAccountsMeta,
+  setActiveAccountIndex,
+  setKeystoreForAccount,
+  type AccountMeta,
+} from './accounts';
 
 const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
 const ARC_CHAIN_ID = 5042002;
@@ -134,7 +149,7 @@ const isValidPrivateKey = (input: string) => {
   return parts.length === 12 && parts.every((part) => part.length > 0);
 };
 
-type ArcWallet = ethers.Wallet | ethers.HDNodeWallet;
+type ArcWallet = (ethers.Wallet & { mnemonic?: { phrase: string } }) | ethers.HDNodeWallet;
 
 type ScanPayload =
   | { kind: 'pay'; id: string }
@@ -497,6 +512,23 @@ function App() {
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [contactSearchQuery, setContactSearchQuery] = useState('');
 
+  // Account management state
+  const [accounts, setAccounts] = useState<AccountMeta[]>(getStoredAccountsMeta());
+  const [activeAccountIndex, setActiveAccountIndexState] = useState<number>(getActiveAccountIndex());
+  const [showAccountPin, setShowAccountPin] = useState(false);
+  const [accountPin, setAccountPin] = useState('');
+  const [accountPinError, setAccountPinError] = useState<string | null>(null);
+  const [pendingAccountAction, setPendingAccountAction] = useState<
+    | { type: 'add' }
+    | { type: 'switch'; index: number }
+    | { type: 'remove'; index: number }
+    | null
+  >(null);
+  const [confirmAccountRemoval, setConfirmAccountRemoval] = useState(false);
+  const [removalTargetIndex, setRemovalTargetIndex] = useState<number | null>(null);
+  const [editingAccountIndex, setEditingAccountIndex] = useState<number | null>(null);
+  const [editingAccountLabel, setEditingAccountLabel] = useState('');
+
   // Wallet security state
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -527,8 +559,15 @@ function App() {
 
   // Initialize wallet state on mount
   useEffect(() => {
-    // Check for keystore first (encrypted wallet)
-    const keystore = getKeystoreFromStorage();
+    // Sync account metadata state on mount
+    setAccounts(getStoredAccountsMeta());
+    const activeIndex = getActiveAccountIndex();
+    setActiveAccountIndexState(activeIndex);
+
+    // Check for any derived account keystore first (encrypted wallet)
+    const accountsMeta = getStoredAccountsMeta();
+    const targetIndex = accountsMeta.length > 0 ? activeIndex : null;
+    const keystore = targetIndex !== null ? getKeystoreForAccount(targetIndex) : getKeystoreFromStorage();
     if (keystore) {
       setIsUnlocking(true);
       return;
@@ -644,7 +683,8 @@ function App() {
     setUnlockError(null);
 
     try {
-      const keystore = getKeystoreFromStorage();
+      const activeIndex = getActiveAccountIndex();
+      const keystore = getKeystoreForAccount(activeIndex) ?? getKeystoreFromStorage();
       if (!keystore) {
         throw new Error('Keystore not found');
       }
@@ -684,9 +724,14 @@ function App() {
         throw new Error('Legacy key not found');
       }
 
-      // Create encrypted keystore
+      // Create encrypted keystore for the first account
       const keystore = await encryptWallet(legacyKey, migrationPin);
       setKeystoreInStorage(keystore);
+      // Migration always represents account 0
+      saveAccountsMeta([{ index: 0, label: 'Account 1', address: new ethers.Wallet(legacyKey).address }]);
+      setActiveAccountIndex(0);
+      setAccounts(getStoredAccountsMeta());
+      setActiveAccountIndexState(0);
 
       // Remove legacy key
       localStorage.removeItem(STORAGE_KEY_LEGACY);
@@ -756,6 +801,11 @@ function App() {
       // Encrypt immediately - never write plaintext to storage
       const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
       setKeystoreInStorage(keystore);
+      // Account 0 metadata for new wallet creation
+      saveAccountsMeta([{ index: 0, label: 'Account 1', address: pendingWalletData.wallet.address }]);
+      setActiveAccountIndex(0);
+      setAccounts(getStoredAccountsMeta());
+      setActiveAccountIndexState(0);
 
       setWallet(pendingWalletData.wallet);
       setShowCreatePin(false);
@@ -819,6 +869,11 @@ function App() {
       // Encrypt immediately - never write plaintext to storage
       const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
       setKeystoreInStorage(keystore);
+      // Imported wallet starts as account 0
+      saveAccountsMeta([{ index: 0, label: 'Account 1', address: pendingWalletData.wallet.address }]);
+      setActiveAccountIndex(0);
+      setAccounts(getStoredAccountsMeta());
+      setActiveAccountIndexState(0);
 
       setWallet(pendingWalletData.wallet);
       setShowCreatePin(false);
@@ -851,7 +906,112 @@ function App() {
     setTxHash(null);
     setTxState('idle');
     setIsUnlocking(true);
+    // Clear mnemonic from any in-memory session state
+    setPendingMnemonic(null);
   };
+
+  // --- Account management helpers ---
+  const setActiveAccountIndexWithState = (index: number) => {
+    setActiveAccountIndexState(index);
+    setActiveAccountIndex(index);
+  };
+
+  const deriveAndAddAccount = async (pin: string) => {
+    if (!wallet || !wallet.mnemonic || typeof wallet.mnemonic === 'string') {
+      throw new Error('No wallet session available');
+    }
+
+    const nextIndex = getNextDerivationIndex();
+    const derived = deriveAccountAtIndex(wallet.mnemonic.phrase, nextIndex);
+    const keystore = await encryptWallet(derived.privateKey, pin);
+    const nextAccounts = [...accounts, { index: nextIndex, label: `Account ${nextIndex + 1}`, address: derived.address }];
+    setKeystoreForAccount(nextIndex, keystore);
+    saveAccountsMeta(nextAccounts);
+    setAccounts(nextAccounts);
+    setActiveAccountIndexWithState(nextIndex);
+
+    const connectedWallet = new ethers.Wallet(derived.privateKey).connect(provider);
+    setWallet(connectedWallet);
+    void refreshWalletData(connectedWallet);
+  };
+
+  const switchAccount = async (index: number, pin: string) => {
+    const keystore = getKeystoreForAccount(index);
+    if (!keystore) {
+      throw new Error('Keystore not found for this account');
+    }
+
+    const decrypted = await decryptWallet(keystore, pin);
+    const connectedWallet = decrypted.connect(provider);
+    setWallet(connectedWallet);
+    setActiveAccountIndexWithState(index);
+    void refreshWalletData(connectedWallet);
+  };
+
+  const handleRenameAccount = (index: number, label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const updated = renameAccount(index, trimmed);
+    setAccounts(updated);
+  };
+
+  const requestAccountPinAction = (
+    action: { type: 'add' } | { type: 'switch'; index: number } | { type: 'remove'; index: number },
+  ) => {
+    setPendingAccountAction(action);
+    setShowAccountPin(true);
+    setAccountPin('');
+    setAccountPinError(null);
+  };
+
+  const closeAccountPinModal = () => {
+    setShowAccountPin(false);
+    setAccountPin('');
+    setAccountPinError(null);
+    setPendingAccountAction(null);
+  };
+
+  const submitAccountPin = async () => {
+    const pin = accountPin;
+    if (!pendingAccountAction) return;
+
+    setIsProcessing(true);
+    setAccountPinError(null);
+
+    try {
+      if (pendingAccountAction.type === 'add') {
+        await deriveAndAddAccount(pin);
+      } else if (pendingAccountAction.type === 'switch') {
+        await switchAccount(pendingAccountAction.index, pin);
+      } else if (pendingAccountAction.type === 'remove') {
+        const result = removeAccount(pendingAccountAction.index);
+        if (result) {
+          setAccounts(result.accounts);
+          setActiveAccountIndexWithState(result.activeIndex);
+          const nextKeystore = getKeystoreForAccount(result.activeIndex);
+          if (nextKeystore) {
+            const decrypted = await decryptWallet(nextKeystore, pin);
+            const connectedWallet = decrypted.connect(provider);
+            setWallet(connectedWallet);
+            void refreshWalletData(connectedWallet);
+          }
+          setConfirmAccountRemoval(false);
+          setRemovalTargetIndex(null);
+        }
+      }
+      closeAccountPinModal();
+    } catch (err) {
+      setAccountPinError(err instanceof Error ? err.message : 'Invalid PIN or action failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const activeAccountLabel = useMemo(() => {
+    return accounts.find((a) => a.index === activeAccountIndex)?.label ?? 'Account 1';
+  }, [accounts, activeAccountIndex]);
+  // --- End account management helpers ---
+
 
 
 
@@ -2189,7 +2349,137 @@ function App() {
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
               </button>
-              
+
+              <div className="pt-4 border-t border-[#27272A]">
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[#3B82F6] mb-3">Accounts</p>
+                <div className="space-y-2">
+                  {accounts.map((account) => {
+                    const isActive = account.index === activeAccountIndex;
+                    const isEditing = editingAccountIndex === account.index;
+                    const isConfirmingRemoval = confirmAccountRemoval && removalTargetIndex === account.index;
+
+                    return (
+                      <div key={account.index} className="rounded-xl border border-[#27272A] bg-[#161616] p-3">
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={editingAccountLabel}
+                              onChange={(e) => setEditingAccountLabel(e.target.value.slice(0, 40))}
+                              className="flex-1 rounded-lg border border-[#27272A] bg-[#0a0a0a] px-2 py-1.5 text-sm text-[#FAFAFA] outline-none"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleRenameAccount(account.index, editingAccountLabel);
+                                setEditingAccountIndex(null);
+                                setEditingAccountLabel('');
+                              }}
+                              className="rounded-lg bg-[#3B82F6] px-2.5 py-1.5 text-xs font-medium text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAccountIndex(null);
+                                setEditingAccountLabel('');
+                              }}
+                              className="text-xs text-[#A1A1AA]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate text-sm font-medium text-[#FAFAFA]">{account.label}</p>
+                                {isActive && (
+                                  <span className="rounded-full bg-[#3B82F6]/20 px-2 py-0.5 text-[10px] font-medium text-[#93C5FD]">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-0.5 truncate text-xs text-[#A1A1AA] font-mono">
+                                {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {!isActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => requestAccountPinAction({ type: 'switch', index: account.index })}
+                                  className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                                >
+                                  Switch
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingAccountIndex(account.index);
+                                  setEditingAccountLabel(account.label);
+                                }}
+                                className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:text-[#FAFAFA]"
+                              >
+                                Rename
+                              </button>
+                              {accounts.length > 1 && (
+                                isConfirmingRemoval ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRemovalTargetIndex(account.index);
+                                        requestAccountPinAction({ type: 'remove', index: account.index });
+                                      }}
+                                      className="rounded-lg bg-red-500 px-2 py-1 text-[11px] text-white"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setConfirmAccountRemoval(false);
+                                        setRemovalTargetIndex(null);
+                                      }}
+                                      className="text-[11px] text-[#A1A1AA]"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmAccountRemoval(true);
+                                      setRemovalTargetIndex(account.index);
+                                    }}
+                                    className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
+                                  >
+                                    Remove
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => requestAccountPinAction({ type: 'add' })}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-medium text-[#93C5FD] transition hover:border-[#3B82F6] hover:bg-[#3B82F6]/20"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Account
+                </button>
+              </div>
+
               <div className="pt-4 border-t border-[#27272A]">
                 <p className="text-[11px] uppercase tracking-[0.28em] text-red-400 mb-3">Danger Zone</p>
                 {!confirmRemoval ? (
@@ -2213,8 +2503,9 @@ function App() {
                       <button
                         onClick={() => {
                           // Execute wallet removal
-                          removeKeystoreFromStorage();
+                          removeAllAccountData();
                           localStorage.removeItem(STORAGE_KEY_LEGACY);
+                          removeKeystoreFromStorage();
                           setPrivateKey(null);
                           setWallet(null);
                           setBalance('0');
@@ -2246,6 +2537,50 @@ function App() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showAccountPin ? (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Confirm PIN</h3>
+              <button onClick={closeAccountPinModal} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+            <p className="mt-2 text-sm text-[#A1A1AA]">
+              Enter your wallet PIN to {pendingAccountAction?.type === 'add'
+                ? 'add a new account'
+                : pendingAccountAction?.type === 'switch'
+                  ? 'switch accounts'
+                  : 'confirm this action'}.
+            </p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <PinInput
+                  value={accountPin}
+                  onChange={setAccountPin}
+                  placeholder="Enter PIN"
+                  disabled={isProcessing}
+                  error={accountPinError}
+                />
+                {accountPinError && <p className="mt-2 text-sm text-red-400">{accountPinError}</p>}
+              </div>
+              <button
+                onClick={() => void submitAccountPin()}
+                disabled={isProcessing || accountPin.length === 0}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+              >
+                {isProcessing ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Confirming…
+                  </>
+                ) : (
+                  'Confirm'
+                )}
+              </button>
             </div>
           </div>
         </div>
