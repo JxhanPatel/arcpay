@@ -62,7 +62,6 @@ import {
   STORAGE_KEY_LEGACY,
 } from './utils/walletStorage';
 import {
-  buildKeystoreKey,
   deriveAccountAtIndex,
   getActiveAccountIndex,
   getKeystoreForAccount,
@@ -515,15 +514,12 @@ function App() {
   // Account management state
   const [accounts, setAccounts] = useState<AccountMeta[]>(getStoredAccountsMeta());
   const [activeAccountIndex, setActiveAccountIndexState] = useState<number>(getActiveAccountIndex());
-  const [showAccountPin, setShowAccountPin] = useState(false);
-  const [accountPin, setAccountPin] = useState('');
-  const [accountPinError, setAccountPinError] = useState<string | null>(null);
-  const [pendingAccountAction, setPendingAccountAction] = useState<
-    | { type: 'add' }
-    | { type: 'switch'; index: number }
-    | { type: 'remove'; index: number }
-    | null
-  >(null);
+  // In-memory session seed (mnemonic) for HD derivation. Lives only as long as the
+  // wallet is unlocked — never persisted to localStorage. Null when the wallet was
+  // unlocked from a legacy private-key-only keystore that predates mnemonic caching.
+  const [activeSessionSeed, setActiveSessionSeed] = useState<string | null>(null);
+  const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [addAccountError, setAddAccountError] = useState<string | null>(null);
   const [confirmAccountRemoval, setConfirmAccountRemoval] = useState(false);
   const [removalTargetIndex, setRemovalTargetIndex] = useState<number | null>(null);
   const [editingAccountIndex, setEditingAccountIndex] = useState<number | null>(null);
@@ -549,11 +545,18 @@ function App() {
   const [showMnemonicReveal, setShowMnemonicReveal] = useState(false);
   const [hasConfirmedMnemonicSave, setHasConfirmedMnemonicSave] = useState(false);
   const [copiedPhrase, setCopiedPhrase] = useState(false);
+  // Holds the mnemonic captured during create/import until the wallet is finalized,
+  // at which point it is promoted into activeSessionSeed. In-memory only.
+  const [pendingSessionSeed, setPendingSessionSeed] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const scannerLoopRef = useRef<number | null>(null);
   const fallbackReaderRef = useRef<BrowserQRCodeReader | null>(null);
+  // Holds the PIN captured at unlock/create/import time for the lifetime of the
+  // unlocked session. Lets keystore writes (e.g. Add Account) reuse the same PIN
+  // without ever re-prompting the user. Cleared on lock/logout.
+  const sessionPinRef = useRef<string>('');
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
 
@@ -691,6 +694,14 @@ function App() {
 
       const decryptedWallet = await decryptWallet(keystore, pin);
       const connectedWallet = decryptedWallet.connect(provider);
+      // Cache the mnemonic in memory for this unlocked session so HD accounts can be
+      // derived later without re-prompting for the PIN. Legacy private-key-only
+      // keystores have no mnemonic, leaving activeSessionSeed null (Add Account disabled).
+      const sessionMnemonic = (decryptedWallet as { mnemonic?: { phrase?: string } }).mnemonic?.phrase;
+      setActiveSessionSeed(typeof sessionMnemonic === 'string' && sessionMnemonic ? sessionMnemonic : null);
+      // Remember the PIN for this unlocked session so later keystore writes
+      // (Add Account) can reuse it without re-prompting.
+      sessionPinRef.current = pin;
       setWallet(connectedWallet);
       setIsUnlocking(false);
       setUnlockPin('');
@@ -739,6 +750,10 @@ function App() {
       // Load the wallet
       const decryptedWallet = await decryptWallet(keystore, migrationPin);
       const connectedWallet = decryptedWallet.connect(provider);
+      // Migration originates from a legacy raw private key, so there is no mnemonic
+      // available for HD derivation in this session.
+      setActiveSessionSeed(null);
+      sessionPinRef.current = migrationPin;
       setWallet(connectedWallet);
       setIsMigrating(false);
       setMigrationPin('');
@@ -764,6 +779,9 @@ function App() {
       const mnemonic = created.mnemonic?.phrase;
       if (mnemonic) {
         setPendingMnemonic(mnemonic);
+        // Stash the phrase so it can be cached as the session seed once the
+        // wallet is finalized (after the PIN step) — never written to storage.
+        setPendingSessionSeed(mnemonic);
         setShowMnemonicReveal(true);
       }
 
@@ -808,6 +826,11 @@ function App() {
       setActiveAccountIndexState(0);
 
       setWallet(pendingWalletData.wallet);
+      // Promote the creation-time mnemonic into the in-memory session seed so
+      // "Add Account" can derive HD children without re-prompting for a PIN.
+      setActiveSessionSeed(pendingSessionSeed);
+      setPendingSessionSeed(null);
+      sessionPinRef.current = pin;
       setShowCreatePin(false);
       setCreatePin('');
       setCreatePinConfirm('');
@@ -833,6 +856,11 @@ function App() {
       }
       const imported = parseWalletInput(importInput).connect(provider);
       const privateKeyValue = imported.privateKey;
+
+      // If the user imported a 12-word seed phrase, stash it so it can be cached as
+      // the session seed after the PIN step. Raw private-key imports leave it null.
+      const importedMnemonic = (imported as { mnemonic?: { phrase?: string } }).mnemonic?.phrase;
+      setPendingSessionSeed(typeof importedMnemonic === 'string' && importedMnemonic ? importedMnemonic : null);
 
       // Store temporarily in state, show PIN modal
       setPendingWalletData({ privateKey: privateKeyValue, wallet: imported });
@@ -876,6 +904,11 @@ function App() {
       setActiveAccountIndexState(0);
 
       setWallet(pendingWalletData.wallet);
+      // Promote the imported mnemonic into the in-memory session seed (null for
+      // raw private-key imports, which cannot derive HD accounts).
+      setActiveSessionSeed(pendingSessionSeed);
+      setPendingSessionSeed(null);
+      sessionPinRef.current = pin;
       setShowCreatePin(false);
       setCreatePin('');
       setCreatePinConfirm('');
@@ -908,6 +941,10 @@ function App() {
     setIsUnlocking(true);
     // Clear mnemonic from any in-memory session state
     setPendingMnemonic(null);
+    // Clear the in-memory HD session seed along with the rest of wallet state
+    setActiveSessionSeed(null);
+    setPendingSessionSeed(null);
+    sessionPinRef.current = '';
   };
 
   // --- Account management helpers ---
@@ -916,32 +953,52 @@ function App() {
     setActiveAccountIndex(index);
   };
 
-  const deriveAndAddAccount = async (pin: string) => {
-    if (!wallet || !wallet.mnemonic || typeof wallet.mnemonic === 'string') {
-      throw new Error('No wallet session available');
+  // Adds a derived HD account using the in-memory session seed. No PIN prompt:
+  // the wallet is already unlocked, so we reuse the same session lifetime as the
+  // decrypted active wallet held in state.
+  const handleAddAccount = async () => {
+    if (!activeSessionSeed || isAddingAccount) {
+      return;
     }
 
-    const nextIndex = getNextDerivationIndex();
-    const derived = deriveAccountAtIndex(wallet.mnemonic.phrase, nextIndex);
-    const keystore = await encryptWallet(derived.privateKey, pin);
-    const nextAccounts = [...accounts, { index: nextIndex, label: `Account ${nextIndex + 1}`, address: derived.address }];
-    setKeystoreForAccount(nextIndex, keystore);
-    saveAccountsMeta(nextAccounts);
-    setAccounts(nextAccounts);
-    setActiveAccountIndexWithState(nextIndex);
+    setIsAddingAccount(true);
+    setAddAccountError(null);
 
-    const connectedWallet = new ethers.Wallet(derived.privateKey).connect(provider);
-    setWallet(connectedWallet);
-    void refreshWalletData(connectedWallet);
+    try {
+      const nextIndex = getNextDerivationIndex();
+      const derived = deriveAccountAtIndex(activeSessionSeed, nextIndex);
+      // Encrypt with the same PIN source used for every other keystore write in
+      // this unlocked session (sessionPinRef, captured at unlock/create/import).
+      const keystore = await encryptWallet(derived.privateKey, sessionPinRef.current);
+      const nextAccounts = [
+        ...accounts,
+        { index: nextIndex, label: `Account ${nextIndex + 1}`, address: derived.address },
+      ];
+      setKeystoreForAccount(nextIndex, keystore);
+      saveAccountsMeta(nextAccounts);
+      // Optimistic UI update — accounts list reflects the new entry immediately.
+      setAccounts(nextAccounts);
+      setActiveAccountIndexWithState(nextIndex);
+
+      const connectedWallet = new ethers.Wallet(derived.privateKey).connect(provider);
+      setWallet(connectedWallet);
+      void refreshWalletData(connectedWallet);
+    } catch (err) {
+      setAddAccountError(err instanceof Error ? err.message : 'Unable to add account.');
+    } finally {
+      setIsAddingAccount(false);
+    }
   };
 
-  const switchAccount = async (index: number, pin: string) => {
+  // Switching accounts stays instant: keystores are already encrypted on disk and
+  // the session is already unlocked, so no PIN or re-derivation is needed.
+  const switchAccount = async (index: number) => {
     const keystore = getKeystoreForAccount(index);
     if (!keystore) {
       throw new Error('Keystore not found for this account');
     }
 
-    const decrypted = await decryptWallet(keystore, pin);
+    const decrypted = await decryptWallet(keystore, sessionPinRef.current);
     const connectedWallet = decrypted.connect(provider);
     setWallet(connectedWallet);
     setActiveAccountIndexWithState(index);
@@ -955,61 +1012,37 @@ function App() {
     setAccounts(updated);
   };
 
-  const requestAccountPinAction = (
-    action: { type: 'add' } | { type: 'switch'; index: number } | { type: 'remove'; index: number },
-  ) => {
-    setPendingAccountAction(action);
-    setShowAccountPin(true);
-    setAccountPin('');
-    setAccountPinError(null);
+  const handleSwitchAccountClick = (index: number) => {
+    void switchAccount(index).catch(() => {
+      setAddAccountError('Unable to switch to this account.');
+    });
   };
 
-  const closeAccountPinModal = () => {
-    setShowAccountPin(false);
-    setAccountPin('');
-    setAccountPinError(null);
-    setPendingAccountAction(null);
-  };
-
-  const submitAccountPin = async () => {
-    const pin = accountPin;
-    if (!pendingAccountAction) return;
-
-    setIsProcessing(true);
-    setAccountPinError(null);
-
-    try {
-      if (pendingAccountAction.type === 'add') {
-        await deriveAndAddAccount(pin);
-      } else if (pendingAccountAction.type === 'switch') {
-        await switchAccount(pendingAccountAction.index, pin);
-      } else if (pendingAccountAction.type === 'remove') {
-        const result = removeAccount(pendingAccountAction.index);
-        if (result) {
-          setAccounts(result.accounts);
-          setActiveAccountIndexWithState(result.activeIndex);
-          const nextKeystore = getKeystoreForAccount(result.activeIndex);
-          if (nextKeystore) {
-            const decrypted = await decryptWallet(nextKeystore, pin);
-            const connectedWallet = decrypted.connect(provider);
-            setWallet(connectedWallet);
-            void refreshWalletData(connectedWallet);
-          }
-          setConfirmAccountRemoval(false);
-          setRemovalTargetIndex(null);
-        }
-      }
-      closeAccountPinModal();
-    } catch (err) {
-      setAccountPinError(err instanceof Error ? err.message : 'Invalid PIN or action failed');
-    } finally {
-      setIsProcessing(false);
+  const handleRemoveAccountConfirm = (index: number) => {
+    const result = removeAccount(index);
+    if (!result) {
+      setConfirmAccountRemoval(false);
+      setRemovalTargetIndex(null);
+      return;
     }
-  };
 
-  const activeAccountLabel = useMemo(() => {
-    return accounts.find((a) => a.index === activeAccountIndex)?.label ?? 'Account 1';
-  }, [accounts, activeAccountIndex]);
+    setAccounts(result.accounts);
+    setActiveAccountIndexWithState(result.activeIndex);
+    const nextKeystore = getKeystoreForAccount(result.activeIndex);
+    if (nextKeystore && sessionPinRef.current) {
+      void decryptWallet(nextKeystore, sessionPinRef.current)
+        .then((decrypted) => {
+          const connectedWallet = decrypted.connect(provider);
+          setWallet(connectedWallet);
+          void refreshWalletData(connectedWallet);
+        })
+        .catch(() => {
+          setAddAccountError('Unable to load the remaining account.');
+        });
+    }
+    setConfirmAccountRemoval(false);
+    setRemovalTargetIndex(null);
+  };
   // --- End account management helpers ---
 
 
@@ -2409,7 +2442,7 @@ function App() {
                               {!isActive && (
                                 <button
                                   type="button"
-                                  onClick={() => requestAccountPinAction({ type: 'switch', index: account.index })}
+                                  onClick={() => handleSwitchAccountClick(account.index)}
                                   className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#FAFAFA] transition hover:border-[#3B82F6]"
                                 >
                                   Switch
@@ -2430,10 +2463,7 @@ function App() {
                                   <div className="flex items-center gap-1">
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setRemovalTargetIndex(account.index);
-                                        requestAccountPinAction({ type: 'remove', index: account.index });
-                                      }}
+                                      onClick={() => handleRemoveAccountConfirm(account.index)}
                                       className="rounded-lg bg-red-500 px-2 py-1 text-[11px] text-white"
                                     >
                                       Confirm
@@ -2470,14 +2500,34 @@ function App() {
                   })}
                 </div>
 
+                {!activeSessionSeed ? (
+                  <p className="mt-3 rounded-xl border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#A1A1AA]">
+                    Re-import your seed phrase to enable multiple accounts
+                  </p>
+                ) : null}
+
                 <button
                   type="button"
-                  onClick={() => requestAccountPinAction({ type: 'add' })}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-medium text-[#93C5FD] transition hover:border-[#3B82F6] hover:bg-[#3B82F6]/20"
+                  onClick={() => void handleAddAccount()}
+                  disabled={!activeSessionSeed || isAddingAccount}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-medium text-[#93C5FD] transition hover:border-[#3B82F6] hover:bg-[#3B82F6]/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Plus className="h-4 w-4" />
-                  Add Account
+                  {isAddingAccount ? (
+                    <>
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                      Adding…
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Add Account
+                    </>
+                  )}
                 </button>
+
+                {addAccountError ? (
+                  <p className="mt-2 text-xs text-red-400">{addAccountError}</p>
+                ) : null}
               </div>
 
               <div className="pt-4 border-t border-[#27272A]">
@@ -2522,6 +2572,9 @@ function App() {
                           setTxState('idle');
                           setIsUnlocking(false);
                           setIsMigrating(false);
+                          setActiveSessionSeed(null);
+                          setPendingSessionSeed(null);
+                          sessionPinRef.current = '';
                         }}
                         className="flex-1 rounded-2xl bg-red-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-red-600"
                       >
@@ -2537,50 +2590,6 @@ function App() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {showAccountPin ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold">Confirm PIN</h3>
-              <button onClick={closeAccountPinModal} className="text-sm text-[#A1A1AA]">Close</button>
-            </div>
-            <p className="mt-2 text-sm text-[#A1A1AA]">
-              Enter your wallet PIN to {pendingAccountAction?.type === 'add'
-                ? 'add a new account'
-                : pendingAccountAction?.type === 'switch'
-                  ? 'switch accounts'
-                  : 'confirm this action'}.
-            </p>
-            <div className="mt-4 space-y-4">
-              <div>
-                <PinInput
-                  value={accountPin}
-                  onChange={setAccountPin}
-                  placeholder="Enter PIN"
-                  disabled={isProcessing}
-                  error={accountPinError}
-                />
-                {accountPinError && <p className="mt-2 text-sm text-red-400">{accountPinError}</p>}
-              </div>
-              <button
-                onClick={() => void submitAccountPin()}
-                disabled={isProcessing || accountPin.length === 0}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
-              >
-                {isProcessing ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Confirming…
-                  </>
-                ) : (
-                  'Confirm'
-                )}
-              </button>
             </div>
           </div>
         </div>
