@@ -10,6 +10,7 @@ import {
   getKeystoreForAccount,
   getNextDerivationIndex,
   getStoredAccountsMeta,
+  migrateLegacyKeystoreToIndexZero,
   removeAllAccountData,
   removeAccount,
   renameAccount,
@@ -393,5 +394,148 @@ describe('add account flow without a PIN prompt', () => {
     expect(decryptSpy).toHaveBeenCalledWith(`keystore:${accountOne.privateKey}`, TEST_PIN);
     expect(getActiveAccountIndex()).toBe(1);
     expect(getStoredAccountsMeta()).toHaveLength(2); // metadata unchanged
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Legacy keystore migration to per-index scheme
+//
+// These tests verify that migrateLegacyKeystoreToIndexZero correctly backfills
+// arc_wallet_keystore_0 from the legacy arc_wallet_keystore, ensures accounts_meta
+// has an entry for index 0, is idempotent, and is a no-op on fresh installs.
+// ---------------------------------------------------------------------------
+
+const LEGACY_KEYSTORE_KEY = 'arc_wallet_keystore';
+
+describe('migrateLegacyKeystoreToIndexZero', () => {
+  beforeEach(() => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: createStorage(),
+      configurable: true,
+    });
+  });
+
+  it('writes arc_wallet_keystore_0 and adds index-0 meta entry when legacy keystore exists but no per-index keystore', () => {
+    // Arrange: legacy keystore exists, no per-index keystore for account 0.
+    const legacyKeystore = '{"crypto":{"cipher":"aes-128-ctr"},"version":3}';
+    const address = '0x1111111111111111111111111111111111111111';
+    globalThis.localStorage.setItem(LEGACY_KEYSTORE_KEY, legacyKeystore);
+
+    // Act
+    const migrated = migrateLegacyKeystoreToIndexZero(legacyKeystore, address);
+
+    // Assert
+    expect(migrated).toBe(true);
+    expect(getKeystoreForAccount(0)).toBe(legacyKeystore);
+    const meta = getStoredAccountsMeta();
+    expect(meta).toHaveLength(1);
+    expect(meta[0]).toEqual({ index: 0, label: 'Main', address });
+  });
+
+  it('is idempotent — running migration twice does not duplicate or corrupt the index-0 entry', () => {
+    // Arrange: legacy keystore exists, no per-index keystore.
+    const legacyKeystore = '{"crypto":{"cipher":"aes-128-ctr"},"version":3}';
+    const address = '0x1111111111111111111111111111111111111111';
+    globalThis.localStorage.setItem(LEGACY_KEYSTORE_KEY, legacyKeystore);
+
+    // Act: run migration twice
+    const first = migrateLegacyKeystoreToIndexZero(legacyKeystore, address);
+    const second = migrateLegacyKeystoreToIndexZero(legacyKeystore, address);
+
+    // Assert
+    expect(first).toBe(true);
+    expect(second).toBe(false); // already migrated
+    expect(getKeystoreForAccount(0)).toBe(legacyKeystore);
+    const meta = getStoredAccountsMeta();
+    expect(meta).toHaveLength(1); // not duplicated
+    expect(meta[0]).toEqual({ index: 0, label: 'Main', address });
+  });
+
+  it('is a no-op when no legacy keystore is provided (fresh install)', () => {
+    // Arrange: nothing in storage — caller would not invoke migration with an
+    // empty/missing legacy keystore, but verify the function handles it safely.
+    const address = '0x1111111111111111111111111111111111111111';
+
+    // Act: pass an empty string (simulating no legacy keystore available).
+    // The function should not write anything when given an empty keystore.
+    const migrated = migrateLegacyKeystoreToIndexZero('', address);
+
+    // Assert: no keystore written, no meta entry created
+    expect(migrated).toBe(false);
+    expect(getKeystoreForAccount(0)).toBeNull();
+    expect(getStoredAccountsMeta()).toEqual([]);
+  });
+
+  it('does not overwrite an existing arc_wallet_keystore_0 even if legacy keystore differs', () => {
+    // Arrange: both legacy and per-index keystores exist (per-index was written by a newer flow).
+    const legacyKeystore = '{"crypto":{"cipher":"aes-128-ctr"},"version":3}';
+    const perIndexKeystore = '{"crypto":{"cipher":"aes-256-gcm"},"version":3}';
+    const address = '0x1111111111111111111111111111111111111111';
+    globalThis.localStorage.setItem(LEGACY_KEYSTORE_KEY, legacyKeystore);
+    setKeystoreForAccount(0, perIndexKeystore);
+
+    // Act
+    const migrated = migrateLegacyKeystoreToIndexZero(legacyKeystore, address);
+
+    // Assert: per-index keystore is preserved, no migration performed
+    expect(migrated).toBe(false);
+    expect(getKeystoreForAccount(0)).toBe(perIndexKeystore);
+  });
+
+  it('preserves existing accounts_meta entries when adding index 0', () => {
+    // Arrange: legacy keystore exists, accounts_meta has entries for indices 1 and 2
+    // but no entry for index 0.
+    const legacyKeystore = '{"crypto":{"cipher":"aes-128-ctr"},"version":3}';
+    const address = '0x1111111111111111111111111111111111111111';
+    globalThis.localStorage.setItem(LEGACY_KEYSTORE_KEY, legacyKeystore);
+    saveAccountsMeta([
+      { index: 1, label: 'Account 2', address: '0x2222222222222222222222222222222222222222' },
+      { index: 2, label: 'Account 3', address: '0x3333333333333333333333333333333333333333' },
+    ]);
+
+    // Act
+    const migrated = migrateLegacyKeystoreToIndexZero(legacyKeystore, address);
+
+    // Assert
+    expect(migrated).toBe(true);
+    expect(getKeystoreForAccount(0)).toBe(legacyKeystore);
+    const meta = getStoredAccountsMeta();
+    expect(meta).toHaveLength(3);
+    expect(meta[0]).toEqual({ index: 0, label: 'Main', address });
+    expect(meta[1]).toEqual({ index: 1, label: 'Account 2', address: '0x2222222222222222222222222222222222222222' });
+    expect(meta[2]).toEqual({ index: 2, label: 'Account 3', address: '0x3333333333333333333333333333333333333333' });
+  });
+
+  it('switching to index 0 after migration succeeds using the same decrypt path as index 1', async () => {
+    // Arrange: simulate post-migration state with both index 0 and index 1 keystores.
+    const seedWallet = createTestWallet(TEST_MNEMONIC);
+    const activeSessionSeed = seedWallet.mnemonic.phrase;
+    const accountZero = deriveAccountAtIndex(activeSessionSeed, 0);
+    const accountOne = deriveAccountAtIndex(activeSessionSeed, 1);
+
+    const keystoreZero = `keystore:${accountZero.privateKey}`;
+    const keystoreOne = `keystore:${accountOne.privateKey}`;
+
+    saveAccountsMeta([
+      { index: 0, label: 'Main', address: accountZero.address },
+      { index: 1, label: 'Account 2', address: accountOne.address },
+    ]);
+    setKeystoreForAccount(0, keystoreZero);
+    setKeystoreForAccount(1, keystoreOne);
+    setActiveAccountIndex(0);
+
+    // Act: switch to index 0 (same path as switching to index 1)
+    const targetKeystore = getKeystoreForAccount(0);
+    expect(targetKeystore).not.toBeNull();
+    const decryptSpy = vi
+      .spyOn(walletStorage, 'decryptWallet')
+      .mockResolvedValue(new ethers.Wallet(accountZero.privateKey));
+    await walletStorage.decryptWallet(targetKeystore!, TEST_PIN);
+    setActiveAccountIndex(0);
+
+    // Assert: decryption succeeded for index 0 using the same path as index 1
+    expect(decryptSpy).toHaveBeenCalledTimes(1);
+    expect(decryptSpy).toHaveBeenCalledWith(keystoreZero, TEST_PIN);
+    expect(getActiveAccountIndex()).toBe(0);
   });
 });

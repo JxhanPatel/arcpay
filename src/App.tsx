@@ -67,6 +67,7 @@ import {
   getKeystoreForAccount,
   getNextDerivationIndex,
   getStoredAccountsMeta,
+  migrateLegacyKeystoreToIndexZero,
   removeAccount,
   removeAllAccountData,
   renameAccount,
@@ -706,6 +707,15 @@ function App() {
       setIsUnlocking(false);
       setUnlockPin('');
       void refreshWalletData(connectedWallet);
+
+      // One-time migration: if the legacy single-account keystore exists but no
+      // per-index keystore for account 0 has been written yet, backfill it so that
+      // switchAccount works for index 0.
+      const legacyKeystore = getKeystoreFromStorage();
+      if (legacyKeystore && !getKeystoreForAccount(0)) {
+        migrateLegacyKeystoreToIndexZero(legacyKeystore, connectedWallet.address);
+        setAccounts(getStoredAccountsMeta());
+      }
     } catch (err) {
       // Don't leak whether the keystore is malformed vs password is wrong
       setUnlockError('Incorrect PIN or corrupted wallet');
@@ -738,6 +748,8 @@ function App() {
       // Create encrypted keystore for the first account
       const keystore = await encryptWallet(legacyKey, migrationPin);
       setKeystoreInStorage(keystore);
+      // Also write to the per-index keystore slot so switchAccount works for index 0.
+      setKeystoreForAccount(0, keystore);
       // Migration always represents account 0
       saveAccountsMeta([{ index: 0, label: 'Account 1', address: new ethers.Wallet(legacyKey).address }]);
       setActiveAccountIndex(0);
@@ -819,6 +831,8 @@ function App() {
       // Encrypt immediately - never write plaintext to storage
       const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
       setKeystoreInStorage(keystore);
+      // Also write to the per-index keystore slot so switchAccount works for index 0.
+      setKeystoreForAccount(0, keystore);
       // Account 0 metadata for new wallet creation
       saveAccountsMeta([{ index: 0, label: 'Account 1', address: pendingWalletData.wallet.address }]);
       setActiveAccountIndex(0);
@@ -897,6 +911,8 @@ function App() {
       // Encrypt immediately - never write plaintext to storage
       const keystore = await encryptWallet(pendingWalletData.privateKey, pin);
       setKeystoreInStorage(keystore);
+      // Also write to the per-index keystore slot so switchAccount works for index 0.
+      setKeystoreForAccount(0, keystore);
       // Imported wallet starts as account 0
       saveAccountsMeta([{ index: 0, label: 'Account 1', address: pendingWalletData.wallet.address }]);
       setActiveAccountIndex(0);
@@ -1014,7 +1030,11 @@ function App() {
 
   const handleSwitchAccountClick = (index: number) => {
     void switchAccount(index).catch(() => {
-      setAddAccountError('Unable to switch to this account.');
+      if (index === 0) {
+        setAddAccountError('Main account needs to be re-encrypted — re-enter your PIN to fix this.');
+      } else {
+        setAddAccountError('Unable to switch to this account.');
+      }
     });
   };
 

@@ -221,3 +221,45 @@ export const getNextDerivationIndex = (): number => {
 
   return Math.max(...accounts.map((a) => a.index)) + 1;
 };
+
+/**
+ * One-time migration: if the legacy single-account keystore (`arc_wallet_keystore`)
+ * exists but no per-index keystore for account 0 (`arc_wallet_keystore_0`) has been
+ * written yet, copy the legacy keystore into the new per-index scheme and ensure
+ * `arc_wallet_accounts_meta` has a matching entry for index 0.
+ *
+ * Idempotent — safe to call on every app load. Returns true if a migration was
+ * performed, false if nothing needed to be done.
+ */
+export const migrateLegacyKeystoreToIndexZero = (
+  legacyKeystoreJson: string,
+  address: string,
+): boolean => {
+  // If arc_wallet_keystore_0 already exists, nothing to migrate.
+  const existing = getKeystoreForAccount(0);
+  if (existing !== null) {
+    return false;
+  }
+
+  // Write the legacy keystore into the per-index slot for account 0.
+  setKeystoreForAccount(0, legacyKeystoreJson);
+
+  // Verify the write succeeded before touching metadata.
+  const verify = getKeystoreForAccount(0);
+  if (verify === null) {
+    return false;
+  }
+
+  // Ensure accounts_meta has an entry for index 0.
+  const accounts = getStoredAccountsMeta();
+  const hasIndexZero = accounts.some((a) => a.index === 0);
+  if (!hasIndexZero) {
+    const next: AccountMeta[] = [
+      { index: 0, label: 'Main', address },
+      ...accounts,
+    ];
+    saveAccountsMeta(next);
+  }
+
+  return true;
+};
