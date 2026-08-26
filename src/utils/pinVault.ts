@@ -190,6 +190,70 @@ export function parseVaultPayload(raw: string): EncryptedVaultPayload | null {
 
 // --- localStorage helpers -------------------------------------------------
 
+// --- Seed phrase vault ------------------------------------------------------
+//
+// The BIP44 mnemonic is encrypted with the exact same PIN-derived AES-GCM key
+// scheme as the private-key vault above (PBKDF2/SHA-256, 100,000 iterations,
+// random per-entry salt + 96-bit IV) and persisted under its own dedicated
+// localStorage key so it can be versioned/migrated independently of the
+// per-index keystores and the `arc_wallet_pk` vault.
+//
+// Only the ciphertext ever touches persistent storage. The plaintext mnemonic
+// lives exclusively in memory for the duration of an unlocked session (see
+// src/accounts.ts) and is never logged, sent over the network, or written to
+// localStorage unencrypted.
+
+export const SEED_VAULT_STORAGE_KEY = 'arc_wallet_seed_vault';
+
+/** Encrypts a mnemonic phrase using the same scheme as `encryptPrivateKey`. */
+export async function encryptSeedPhrase(
+  mnemonic: string,
+  pin: string,
+): Promise<EncryptedVaultPayload> {
+  return encryptPrivateKey(mnemonic, pin);
+}
+
+/** Decrypts a seed vault payload. Throws the same generic error on a wrong PIN or corrupted data. */
+export async function decryptSeedPhrase(
+  payload: EncryptedVaultPayload,
+  pin: string,
+): Promise<string> {
+  return decryptPrivateKey(payload, pin);
+}
+
+export const getSeedVaultFromStorage = (): string | null => {
+  try {
+    return localStorage.getItem(SEED_VAULT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const setSeedVaultInStorage = (vaultJson: string): void => {
+  try {
+    localStorage.setItem(SEED_VAULT_STORAGE_KEY, vaultJson);
+  } catch {
+    // Ignore write failures (e.g. quota exceeded / storage disabled)
+  }
+};
+
+export const removeSeedVaultFromStorage = (): void => {
+  try {
+    localStorage.removeItem(SEED_VAULT_STORAGE_KEY);
+  } catch {
+    // Ignore removal failures
+  }
+};
+
+/** True when an encrypted seed vault entry exists in storage (present ≠ unlocked). */
+export const hasSeedVault = (): boolean => {
+  try {
+    return localStorage.getItem(SEED_VAULT_STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+};
+
 export const getVaultFromStorage = (): string | null => {
   try {
     return localStorage.getItem(VAULT_STORAGE_KEY);

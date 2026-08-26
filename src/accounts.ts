@@ -1,10 +1,30 @@
 import { ethers } from 'ethers';
+import {
+  decryptPrivateKey,
+  encryptPrivateKey,
+  getSeedVaultFromStorage,
+  parseVaultPayload,
+  removeSeedVaultFromStorage,
+  serializeVaultPayload,
+  setSeedVaultInStorage,
+} from './utils/pinVault';
+import { encryptWallet } from './utils/walletStorage';
 
 export type AccountMeta = {
   index: number;
   label: string;
   address: string;
+  /**
+   * How the wallet was originally brought onto this device.
+   * - 'seed': imported/created from a BIP44 seed phrase (extra accounts derivable).
+   * - 'private-key': imported from a raw 0x private key (no derivable seed).
+   * Optional because wallets created before this field existed have no value —
+   * those are the pre-fix users handled by the one-time migration messaging.
+   */
+  source?: AccountSource;
 };
+
+export type AccountSource = 'seed' | 'private-key';
 
 export const ACCOUNTS_META_KEY = 'arc_wallet_accounts_meta';
 export const ACTIVE_ACCOUNT_KEY = 'arc_wallet_active_index';
@@ -68,12 +88,20 @@ export const getStoredAccountsMeta = (): AccountMeta[] => {
       const index = Number(candidate.index);
       const label = typeof candidate.label === 'string' ? candidate.label : '';
       const address = typeof candidate.address === 'string' ? candidate.address : '';
+      const source =
+        candidate.source === 'seed' || candidate.source === 'private-key'
+          ? (candidate.source as AccountSource)
+          : undefined;
 
       if (!Number.isFinite(index) || !address) {
         return [];
       }
 
-      return [{ index, label, address } satisfies AccountMeta];
+      // `source` is only included when present so legacy payloads round-trip
+      // without gaining a spurious field.
+      return [
+        (source ? { index, label, address, source } : { index, label, address }) satisfies AccountMeta,
+      ];
     });
   } catch {
     return [];
@@ -198,6 +226,7 @@ export const removeAllAccountData = (): void => {
     try {
       storage.removeItem(ACCOUNTS_META_KEY);
       storage.removeItem(ACTIVE_ACCOUNT_KEY);
+      removeSeedVaultFromStorage();
     } catch {
       // Ignore write failures.
     }
@@ -235,6 +264,11 @@ export const migrateLegacyKeystoreToIndexZero = (
   legacyKeystoreJson: string,
   address: string,
 ): boolean => {
+  // Nothing to migrate from (fresh install / missing legacy data) — no-op.
+  if (!legacyKeystoreJson || !legacyKeystoreJson.trim()) {
+    return false;
+  }
+
   // If arc_wallet_keystore_0 already exists, nothing to migrate.
   const existing = getKeystoreForAccount(0);
   if (existing !== null) {
@@ -262,4 +296,159 @@ export const migrateLegacyKeystoreToIndexZero = (
   }
 
   return true;
+};
+
+// --- In-memory session seed -------------------------------------------------
+//
+// The plaintext mnemonic is held in a module-level variable (NOT React state)
+// so it does not show up in component state inspectors. It exists only for the
+// lifetime of an unlocked session:
+//   - set at unlock time when `arc_wallet_seed_vault` decrypts successfully,
+//     or at create/import finalize before the first lock;
+//   - cleared on lock/logout/wallet removal.
+// It is never written to localStorage, console, or any network request.
+
+let sessionSeedMnemonic: string | null = null;
+
+export const setSessionSeed = (mnemonic: string | null): void => {
+  sessionSeedMnemonic = typeof mnemonic === 'string' && mnemonic ? mnemonic : null;
+};
+
+export const getSessionSeed = (): string | null => {
+  return sessionSeedMnemonic;
+};
+
+export const clearSessionSeed = (): void => {
+  sessionSeedMnemonic = null;
+};
+
+// --- Seed vault persistence (encrypted at rest) -----------------------------
+
+/** Encrypts the mnemonic with the PIN and persists it under `arc_wallet_seed_vault`. */
+export const persistSeedVault = async (mnemonic: string, pin: string): Promise<void> => {
+  const payload = await encryptPrivateKey(mnemonic, pin);
+  setSeedVaultInStorage(serializeVaultPayload(payload));
+};
+
+/**
+ * Decrypts `arc_wallet_seed_vault` with the PIN and holds the plaintext
+ * mnemonic in memory for the unlocked session. Returns the mnemonic, or null
+ * when no seed vault exists (e.g. raw-private-key imports) or decryption fails.
+ */
+export const loadSessionSeedFromVault = async (pin: string): Promise<string | null> => {
+  // Any previously held seed belongs to a prior locked session.
+  clearSessionSeed();
+
+  const raw = getSeedVaultFromStorage();
+  if (!raw) {
+    return null;
+  }
+
+  const payload = parseVaultPayload(raw);
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const mnemonic = await decryptPrivateKey(payload, pin);
+    if (!mnemonic) {
+      return null;
+    }
+    sessionSeedMnemonic = mnemonic;
+    return mnemonic;
+  } catch {
+    // Wrong PIN or corrupted payload — treat as "no derivable seed this session".
+    return null;
+  }
+};
+
+// --- Add Account ------------------------------------------------------------
+
+export type AddAccountUnavailableReason = 'private-key' | 'migration';
+
+/**
+ * Distinct, user-facing explanations for why additional accounts can't be
+ * derived right now. Deliberately two different messages:
+ * - 'private-key': the wallet was imported from a raw 0x key — there is no
+ *   seed to derive from, ever; they'd need to import a seed phrase instead.
+ * - 'migration': pre-fix wallets have keystore_0 but no persisted seed vault.
+ *   The seed cannot be recovered retroactively, so ask for a one-time
+ *   re-import; after that it persists and this message never appears again.
+ */
+export const ADD_ACCOUNT_UNAVAILABLE_MESSAGES: Record<AddAccountUnavailableReason, string> = {
+  'private-key':
+    "This wallet was imported with a raw private key, which can't derive additional accounts. Import your seed phrase instead if you want multiple accounts.",
+  migration:
+    'Re-import your seed phrase once to enable multiple accounts — after that it will be remembered securely.',
+};
+
+/**
+ * Why "Add Account" is unavailable right now, or null when derivation is
+ * possible (an unlocked session holds the seed).
+ *
+ * Resolution order matters:
+ * 1. Session seed present → available.
+ * 2. Index-0 account explicitly marked 'private-key' → distinct not-derivable message.
+ * 3. Everything else (keystore_0 present but no source flag and no seed vault,
+ *    i.e. the pre-fix bug) → one-time migration message ONLY.
+ */
+export const getAddAccountUnavailableReason = (): AddAccountUnavailableReason | null => {
+  if (sessionSeedMnemonic) {
+    return null;
+  }
+
+  const primary = getStoredAccountsMeta().find((account) => account.index === 0);
+  if (primary?.source === 'private-key') {
+    return 'private-key';
+  }
+
+  return 'migration';
+};
+
+export type AddAccountOutcome =
+  | {
+      status: 'ok';
+      /** Newly created account metadata (also appended to accounts_meta). */
+      account: AccountMeta;
+      /** Private key of the new account — in-memory only, never persisted in plaintext. */
+      privateKey: string;
+      /** Encrypted keystore JSON written to `arc_wallet_keystore_{index}`. */
+      keystoreJson: string;
+    }
+  | { status: 'unavailable'; reason: AddAccountUnavailableReason };
+
+/**
+ * Derives the next sequential HD account (m/44'/60'/0'/0/{index}) from the
+ * in-memory session seed, encrypts its private key into a fresh per-index
+ * keystore, appends it to accounts_meta, and returns the result. No prompts:
+ * requires only the already-unlocked session seed and the session PIN.
+ *
+ * Returns `{ status: 'unavailable' }` instead of throwing when there is no
+ * derivable seed, so callers can surface reason-specific messaging.
+ */
+export const addDerivedAccount = async (pin: string): Promise<AddAccountOutcome> => {
+  const unavailableReason = getAddAccountUnavailableReason();
+  if (unavailableReason || !sessionSeedMnemonic) {
+    return { status: 'unavailable', reason: unavailableReason ?? 'migration' };
+  }
+
+  const seed = sessionSeedMnemonic;
+  const nextIndex = getNextDerivationIndex();
+  const derived = deriveAccountAtIndex(seed, nextIndex);
+  const keystoreJson = await encryptWallet(derived.privateKey, pin);
+
+  setKeystoreForAccount(nextIndex, keystoreJson);
+
+  const nextAccounts: AccountMeta[] = [
+    ...getStoredAccountsMeta(),
+    { index: nextIndex, label: `Account ${nextIndex + 1}`, address: derived.address },
+  ];
+  saveAccountsMeta(nextAccounts);
+
+  return {
+    status: 'ok',
+    account: nextAccounts[nextAccounts.length - 1],
+    privateKey: derived.privateKey,
+    keystoreJson,
+  };
 };

@@ -54,6 +54,7 @@ import {
   encryptPrivateKey,
   getVaultFromStorage,
   parseVaultPayload,
+  removeSeedVaultFromStorage,
   removeVaultFromStorage,
   serializeVaultPayload,
   setVaultInStorage,
@@ -68,18 +69,24 @@ import {
   STORAGE_KEY_LEGACY,
 } from './utils/walletStorage';
 import {
-  deriveAccountAtIndex,
+  ADD_ACCOUNT_UNAVAILABLE_MESSAGES,
+  addDerivedAccount,
+  clearSessionSeed,
   getActiveAccountIndex,
+  getAddAccountUnavailableReason,
   getKeystoreForAccount,
-  getNextDerivationIndex,
+  getSessionSeed,
   getStoredAccountsMeta,
+  loadSessionSeedFromVault,
   migrateLegacyKeystoreToIndexZero,
+  persistSeedVault,
   removeAccount,
   removeAllAccountData,
   renameAccount,
   saveAccountsMeta,
   setActiveAccountIndex,
   setKeystoreForAccount,
+  setSessionSeed,
   type AccountMeta,
 } from './accounts';
 
@@ -589,10 +596,15 @@ function App() {
   // Account management state
   const [accounts, setAccounts] = useState<AccountMeta[]>(getStoredAccountsMeta());
   const [activeAccountIndex, setActiveAccountIndexState] = useState<number>(getActiveAccountIndex());
-  // In-memory session seed (mnemonic) for HD derivation. Lives only as long as the
-  // wallet is unlocked — never persisted to localStorage. Null when the wallet was
-  // unlocked from a legacy private-key-only keystore that predates mnemonic caching.
-  const [activeSessionSeed, setActiveSessionSeed] = useState<string | null>(null);
+  // Whether an unlocked session currently holds the decrypted mnemonic in
+  // memory (module-level variable inside src/accounts.ts — deliberately NOT
+  // React state, so the plaintext seed never appears in state inspectors).
+  // Only this boolean flag is mirrored into React for rendering.
+  const [hasSessionSeed, setHasSessionSeed] = useState<boolean>(() => getSessionSeed() !== null);
+  // Why "Add Account" is unavailable when hasSessionSeed is false. Two distinct
+  // states: raw-private-key wallets can never derive more accounts, while
+  // pre-fix seed-phrase wallets get a one-time "re-import once" migration ask.
+  const [addAccountHint, setAddAccountHint] = useState<string | null>(null);
   const [isAddingAccount, setIsAddingAccount] = useState(false);
   const [addAccountError, setAddAccountError] = useState<string | null>(null);
   const [confirmAccountRemoval, setConfirmAccountRemoval] = useState(false);
@@ -626,7 +638,8 @@ function App() {
   const [hasConfirmedMnemonicSave, setHasConfirmedMnemonicSave] = useState(false);
   const [copiedPhrase, setCopiedPhrase] = useState(false);
   // Holds the mnemonic captured during create/import until the wallet is finalized,
-  // at which point it is promoted into activeSessionSeed. In-memory only.
+  // at which point it is encrypted into `arc_wallet_seed_vault` AND held in
+  // in-memory session storage (see src/accounts.ts). In-memory only.
   const [pendingSessionSeed, setPendingSessionSeed] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -762,11 +775,15 @@ function App() {
       }
 
       const connectedWallet = decryptedWallet.connect(provider);
-      // Cache the mnemonic in memory for this unlocked session so HD accounts can be
-      // derived later without re-prompting for the PIN. Legacy private-key-only
-      // keystores have no mnemonic, leaving activeSessionSeed null (Add Account disabled).
-      const sessionMnemonic = (decryptedWallet as { mnemonic?: { phrase?: string } }).mnemonic?.phrase;
-      setActiveSessionSeed(typeof sessionMnemonic === 'string' && sessionMnemonic ? sessionMnemonic : null);
+      // The PIN has now been proven correct. Decrypt the seed vault (if present)
+      // into in-memory session storage so HD accounts can be derived later
+      // without re-prompting. Wallets without a seed vault (raw-private-key
+      // imports, or pre-fix wallets awaiting one-time re-import) leave the
+      // session seed unset — Add Account then explains which case applies.
+      const sessionMnemonic = await loadSessionSeedFromVault(pin);
+      setHasSessionSeed(sessionMnemonic !== null);
+      const unavailableReason = sessionMnemonic ? null : getAddAccountUnavailableReason();
+      setAddAccountHint(unavailableReason ? ADD_ACCOUNT_UNAVAILABLE_MESSAGES[unavailableReason] : null);
       // Remember the PIN for this unlocked session so later keystore writes
       // (Add Account) can reuse it without re-prompting.
       sessionPinRef.current = pin;
@@ -882,16 +899,34 @@ function App() {
         const keystore = await encryptWallet(pendingPrivateKey, pin);
         setKeystoreInStorage(keystore);
         setKeystoreForAccount(0, keystore);
-        
-        saveAccountsMeta([{ index: 0, label: 'Account 1', address: pendingWallet.address }]);
+
+        // If this wallet came from a seed phrase, encrypt the mnemonic with the
+        // same PIN-derived key and persist it under its own dedicated storage
+        // key (`arc_wallet_seed_vault`) so future unlocks can restore HD
+        // derivation. Raw-private-key wallets have no derivable seed — record
+        // that on the account so Add Account can explain it distinctly.
+        const walletSource = pendingSessionSeed ? 'seed' : 'private-key';
+        if (pendingSessionSeed) {
+          await persistSeedVault(pendingSessionSeed, pin);
+          setSessionSeed(pendingSessionSeed);
+          setHasSessionSeed(true);
+          setAddAccountHint(null);
+        } else {
+          clearSessionSeed();
+          setHasSessionSeed(false);
+          setAddAccountHint(ADD_ACCOUNT_UNAVAILABLE_MESSAGES['private-key']);
+        }
+
+        saveAccountsMeta([
+          { index: 0, label: 'Account 1', address: pendingWallet.address, source: walletSource },
+        ]);
         setActiveAccountIndex(0);
         setAccounts(getStoredAccountsMeta());
         setActiveAccountIndexState(0);
 
         setWallet(pendingWallet);
-        setActiveSessionSeed(pendingSessionSeed);
-        setPendingSessionSeed(null);
         sessionPinRef.current = pin;
+        setPendingSessionSeed(null);
         
         setPendingPrivateKey(null);
         setPendingWallet(null);
@@ -928,7 +963,11 @@ function App() {
     setAppState('unlock');
     setPasscodeError(null);
     setPendingMnemonic(null);
-    setActiveSessionSeed(null);
+    // Drop the plaintext mnemonic from memory — it must not outlive the
+    // unlocked session. The encrypted copy stays in `arc_wallet_seed_vault`.
+    clearSessionSeed();
+    setHasSessionSeed(false);
+    setAddAccountHint(null);
     setPendingSessionSeed(null);
     sessionPinRef.current = '';
   };
@@ -941,9 +980,10 @@ function App() {
 
   // Adds a derived HD account using the in-memory session seed. No PIN prompt:
   // the wallet is already unlocked, so we reuse the same session lifetime as the
-  // decrypted active wallet held in state.
+  // decrypted active wallet held in state. When no seed is available, surfaces
+  // the reason-specific message (raw private key vs. one-time re-import).
   const handleAddAccount = async () => {
-    if (!activeSessionSeed || isAddingAccount) {
+    if (!hasSessionSeed || isAddingAccount) {
       return;
     }
 
@@ -951,26 +991,24 @@ function App() {
     setAddAccountError(null);
 
     try {
-      const nextIndex = getNextDerivationIndex();
-      const derived = deriveAccountAtIndex(activeSessionSeed, nextIndex);
-      // Encrypt with the same PIN source used for every other keystore write in
-      // this unlocked session (sessionPinRef, captured at unlock/create/import).
-      const keystore = await encryptWallet(derived.privateKey, sessionPinRef.current);
-      const nextAccounts = [
-        ...accounts,
-        { index: nextIndex, label: `Account ${nextIndex + 1}`, address: derived.address },
-      ];
-      setKeystoreForAccount(nextIndex, keystore);
-      saveAccountsMeta(nextAccounts);
+      const outcome = await addDerivedAccount(sessionPinRef.current);
+      if (outcome.status === 'unavailable') {
+        setAddAccountError(ADD_ACCOUNT_UNAVAILABLE_MESSAGES[outcome.reason]);
+        return;
+      }
+
+      const { account: newAccount, privateKey } = outcome;
+
       // Keep the PIN vault in sync with the newly active account so the next
       // unlock restores this exact account.
-      const vaultPayload = await encryptPrivateKey(derived.privateKey, sessionPinRef.current);
+      const vaultPayload = await encryptPrivateKey(privateKey, sessionPinRef.current);
       setVaultInStorage(serializeVaultPayload(vaultPayload));
-      // Optimistic UI update — accounts list reflects the new entry immediately.
-      setAccounts(nextAccounts);
-      setActiveAccountIndexWithState(nextIndex);
 
-      const connectedWallet = new ethers.Wallet(derived.privateKey).connect(provider);
+      // Optimistic UI update — accounts list reflects the new entry immediately.
+      setAccounts(getStoredAccountsMeta());
+      setActiveAccountIndexWithState(newAccount.index);
+
+      const connectedWallet = new ethers.Wallet(privateKey).connect(provider);
       setWallet(connectedWallet);
       void refreshWalletData(connectedWallet);
     } catch (err) {
@@ -2308,16 +2346,16 @@ function App() {
                   })}
                 </div>
 
-                {!activeSessionSeed ? (
+                {!hasSessionSeed && addAccountHint ? (
                   <p className="mt-3 rounded-xl border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#A1A1AA]">
-                    Re-import your seed phrase to enable multiple accounts
+                    {addAccountHint}
                   </p>
                 ) : null}
 
                 <button
                   type="button"
                   onClick={() => void handleAddAccount()}
-                  disabled={!activeSessionSeed || isAddingAccount}
+                  disabled={!hasSessionSeed || isAddingAccount}
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-medium text-[#93C5FD] transition hover:border-[#3B82F6] hover:bg-[#3B82F6]/20 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isAddingAccount ? (
@@ -2365,6 +2403,7 @@ function App() {
                           localStorage.removeItem(STORAGE_KEY_LEGACY);
                           removeKeystoreFromStorage();
                           removeVaultFromStorage();
+                          removeSeedVaultFromStorage();
                           setPrivateKey(null);
                           setWallet(null);
                           setBalance('0');
@@ -2380,7 +2419,9 @@ function App() {
                           setTxHash(null);
                           setTxState('idle');
                           setAppState('setup');
-                          setActiveSessionSeed(null);
+                          clearSessionSeed();
+                          setHasSessionSeed(false);
+                          setAddAccountHint(null);
                           setPendingSessionSeed(null);
                           sessionPinRef.current = '';
                         }}
