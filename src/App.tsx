@@ -154,6 +154,188 @@ export const buildSendTransactionPlan = (
   };
 };
 
+// ---------------------------------------------------------------------------
+// Optimistic post-send updates
+//
+// A send should be reflected in Holdings and in history the moment
+// wallet.sendTransaction (or the ERC-20 transfer call) resolves — i.e. as soon
+// as we hold a tx hash — not several seconds later when the explorer poll
+// indexes it. The pure helpers below produce every state transition used by
+// `handleSend`; keeping them pure makes the per-asset decimals handling
+// directly unit-testable without touching a live RPC.
+// ---------------------------------------------------------------------------
+
+export type SendableAssetEntry = {
+  key: string;
+  symbol: string;
+  balance: string;
+  decimals: number;
+};
+
+export type OptimisticBalanceSnapshot = {
+  balance: string;
+  assetBalances: SendableAssetEntry[];
+  tokenAssets: SendableAssetEntry[];
+};
+
+export type OptimisticSendUpdate = {
+  historyItem: TransactionHistoryItem;
+  snapshot: OptimisticBalanceSnapshot;
+  nextBalance: string;
+  nextAssetBalances: SendableAssetEntry[];
+  nextTokenAssets: SendableAssetEntry[];
+};
+
+// State keys that can all refer to the native USDC entry depending on where it
+// came from ('usdc' is the initial default, 'native-usdc' the refreshed one).
+const NATIVE_USDC_KEYS = ['usdc', 'native-usdc'];
+
+const parseDisplayedToRaw = (displayed: string, decimals: number) => {
+  const normalized = String(displayed ?? '').replace(/,/g, '').trim() || '0';
+  return ethers.parseUnits(normalized, decimals);
+};
+
+// Subtracts `sentAmount` from a *displayed* balance string using the SAME
+// decimals basis that displayed string was formatted with — never mixing the
+// 18-decimal native base units used by ethers.parseUnits at send time with a
+// 6-decimal token display. All arithmetic is bigint-based so rollback-safe
+// precision is guaranteed.
+export const decrementDisplayedBalance = (
+  displayedBalance: string,
+  sentAmount: string,
+  decimals: number,
+): string => {
+  try {
+    const currentRaw = parseDisplayedToRaw(displayedBalance, decimals);
+    const amountRaw = parseDisplayedToRaw(sentAmount, decimals);
+    // A valid send can never exceed the balance (validateSendAmount guards
+    // this), but clamp at zero defensively instead of showing a negative.
+    const nextRaw = currentRaw > amountRaw ? currentRaw - amountRaw : 0n;
+    return formatTokenBalance(nextRaw, decimals);
+  } catch {
+    // Malformed input leaves the displayed balance untouched; the next
+    // refreshWalletData supersedes local state anyway.
+    return String(displayedBalance ?? '0');
+  }
+};
+
+export const applyOptimisticAssetDecrement = (
+  assets: SendableAssetEntry[],
+  matchKeys: string[],
+  sentAmount: string,
+): SendableAssetEntry[] => {
+  const normalizedKeys = matchKeys.map((key) => String(key).toLowerCase());
+  return assets.map((asset) =>
+    normalizedKeys.includes(String(asset.key).toLowerCase())
+      ? { ...asset, balance: decrementDisplayedBalance(asset.balance, sentAmount, asset.decimals) }
+      : asset,
+  );
+};
+
+export const createOptimisticSendUpdate = (input: {
+  hash: string;
+  from: string;
+  to: string;
+  assetKey: string;
+  symbol: string;
+  amount: string;
+  decimals: number;
+  balance: string;
+  assetBalances: SendableAssetEntry[];
+  tokenAssets: SendableAssetEntry[];
+}): OptimisticSendUpdate => {
+  const { hash, from, to, assetKey, symbol, amount, decimals } = input;
+
+  // Snapshot BEFORE applying any decrement so a revert can restore the exact
+  // pre-send values rather than recomputing them.
+  const snapshot: OptimisticBalanceSnapshot = {
+    balance: input.balance,
+    assetBalances: input.assetBalances.map((asset) => ({ ...asset })),
+    tokenAssets: input.tokenAssets.map((asset) => ({ ...asset })),
+  };
+
+  let amountRaw = 0n;
+  try {
+    amountRaw = parseDisplayedToRaw(amount, decimals);
+  } catch {
+    amountRaw = 0n;
+  }
+
+  const historyItem: TransactionHistoryItem = {
+    hash,
+    from,
+    to,
+    value: formatTokenBalance(amountRaw, decimals),
+    tokenSymbol: symbol,
+    decimals,
+    timestamp: Date.now(),
+    direction: 'sent',
+    status: 'confirming',
+  };
+
+  return {
+    historyItem,
+    snapshot,
+    // `balance` backs the native USDC figure (formatted from 18-decimal base
+    // units by parseNativeBalance), so it is only decremented for USDC sends.
+    nextBalance:
+      symbol === 'USDC' ? decrementDisplayedBalance(input.balance, amount, decimals) : input.balance,
+    nextAssetBalances: applyOptimisticAssetDecrement(
+      input.assetBalances,
+      symbol === 'USDC' ? [...NATIVE_USDC_KEYS, assetKey] : [assetKey],
+      amount,
+    ),
+    nextTokenAssets: applyOptimisticAssetDecrement(
+      input.tokenAssets,
+      symbol === 'USDC' ? [...NATIVE_USDC_KEYS, assetKey] : [assetKey],
+      amount,
+    ),
+  };
+};
+
+// Flips an unreconciled optimistic ('confirming') history item to its final
+// state once the chain/explorer reports a definitive outcome for its hash.
+export const reconcileOptimisticTransaction = (
+  transactions: TransactionHistoryItem[],
+  hash: string,
+  status: 'ok' | 'error',
+): TransactionHistoryItem[] => {
+  const normalizedHash = String(hash ?? '').toLowerCase();
+  return transactions.map((transaction) =>
+    transaction.status === 'confirming' && String(transaction.hash).toLowerCase() === normalizedHash
+      ? { ...transaction, status }
+      : transaction,
+  );
+};
+
+// Merges a freshly fetched explorer page into the current list without ever
+// producing two entries for the same hash. Optimistic items whose hash has
+// shown up on-chain are dropped in favour of the real explorer record (which
+// carries the real timestamp/confirmations); still-'confirming' items stay
+// pinned to the top until reconciliation completes, and any current item the
+// explorer does not report yet (e.g. a just-reconciled send ahead of the next
+// explorer index pass) is retained instead of vanishing.
+export const mergeFetchedTransactions = (
+  current: TransactionHistoryItem[],
+  fetched: TransactionHistoryItem[],
+): TransactionHistoryItem[] => {
+  const seenHashes = new Set(fetched.map((transaction) => String(transaction.hash).toLowerCase()));
+  const retained: TransactionHistoryItem[] = [];
+  for (const transaction of current) {
+    const normalizedHash = String(transaction.hash).toLowerCase();
+    if (!seenHashes.has(normalizedHash)) {
+      seenHashes.add(normalizedHash);
+      retained.push(transaction);
+    }
+  }
+
+  return [
+    ...retained.filter((transaction) => transaction.status === 'confirming'),
+    ...fetched,
+    ...retained.filter((transaction) => transaction.status !== 'confirming'),
+  ];
+};
+
 const isValidPrivateKey = (input: string) => {
   const normalized = input.trim();
   if (!normalized) return false;
@@ -175,7 +357,7 @@ type BarcodeDetectorLike = {
 
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike;
 
-type TransactionHistoryItem = {
+export type TransactionHistoryItem = {
   hash: string;
   from: string;
   to: string;
@@ -184,7 +366,11 @@ type TransactionHistoryItem = {
   decimals: number;
   timestamp: number;
   direction: 'sent' | 'received';
-  status: 'ok' | 'pending' | 'error';
+  // 'confirming' is an additive, client-side-only state for freshly submitted
+  // sends that have a hash but no on-chain receipt yet. It is distinct from
+  // 'pending', which remains the bucket for genuinely unconfirmed/unknown
+  // statuses coming back from the explorer.
+  status: 'ok' | 'pending' | 'error' | 'confirming';
 };
 
 const toBigInt = (value: unknown) => {
@@ -256,6 +442,10 @@ const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
     label: 'Pending',
     className: 'border-[#27272A] bg-[#161616] text-[#A1A1AA]',
   },
+  confirming: {
+    label: 'Confirming',
+    className: 'border-amber-600/40 bg-amber-500/10 text-amber-300 animate-pulse',
+  },
 };
 
 const normalizeExplorerStatus = (value: string) => {
@@ -315,7 +505,7 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
           : [];
 
   const normalizedCandidates = await Promise.all(
-    candidates.map(async (item) => {
+    candidates.map(async (item): Promise<TransactionHistoryItem | null> => {
       if (!isPlainObject(item)) {
         return null;
       }
@@ -729,10 +919,16 @@ function App() {
 
     try {
       const nextTransactions = await fetchTransactionHistory(targetWallet.address);
-      setTransactions(nextTransactions);
+      // Merge (not replace): any still-'confirming' optimistic item whose hash
+      // has not shown up on-chain yet stays pinned at the top; once the
+      // explorer returns the real record for a hash it wins, so we never end
+      // up with two entries for the same hash.
+      setTransactions((current) => mergeFetchedTransactions(current, nextTransactions));
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Unable to fetch transaction history.');
-      setTransactions([]);
+      // Keep in-flight optimistic items so a transient explorer failure does
+      // not make a pending send vanish from history.
+      setTransactions((current) => current.filter((tx) => tx.status === 'confirming'));
     } finally {
       setIsHistoryLoading(false);
     }
@@ -1578,6 +1774,14 @@ function App() {
     setError(null);
   };
 
+  // Restores the exact pre-send balances captured before the optimistic
+  // decrement — no recomputation, the snapshot values are reapplied verbatim.
+  const rollbackOptimisticSend = (update: OptimisticSendUpdate) => {
+    setBalance(update.snapshot.balance);
+    setAssetBalances(update.snapshot.assetBalances);
+    setTokenAssets(update.snapshot.tokenAssets);
+  };
+
   const handleSend = async () => {
     if (!wallet) return;
     const amountValid = validateSendAmount(sendAmount);
@@ -1608,6 +1812,39 @@ function App() {
         setTxHash(txHashValue);
       }
 
+      // --- Optimistic post-send updates ---
+      // The moment we hold a hash, reflect the send in history and Holdings
+      // instead of waiting for the next explorer poll to index it.
+      const isNativeSend = plan.kind === 'native';
+      // History items for native transfers use the 18-decimal basis the
+      // explorer reports; ERC-20 transfers use the token's own decimals.
+      const optimisticDecimals = isNativeSend
+        ? NATIVE_VALUE_DECIMALS
+        : selectedSendAsset.decimals ?? getAssetDecimals(selectedSendAsset.symbol);
+
+      const sendOptimistic = createOptimisticSendUpdate({
+        hash: txHashValue,
+        from: wallet.address,
+        to: resolvedRecipient,
+        assetKey: selectedSendAsset.key,
+        symbol: selectedSendAsset.symbol,
+        amount: sendAmount.trim(),
+        decimals: optimisticDecimals,
+        balance,
+        assetBalances,
+        tokenAssets,
+      });
+
+      setTransactions((current) => [
+        sendOptimistic.historyItem,
+        ...current.filter((tx) => tx.hash.toLowerCase() !== txHashValue.toLowerCase()),
+      ]);
+      setAssetBalances(sendOptimistic.nextAssetBalances);
+      setTokenAssets(sendOptimistic.nextTokenAssets);
+      if (selectedSendAsset.symbol === 'USDC') {
+        setBalance(sendOptimistic.nextBalance);
+      }
+
       // Move to 'confirming' state immediately so UI shows hash + spinner
       setTxState('confirming');
       setSendReview(false);
@@ -1634,20 +1871,32 @@ function App() {
           // Timed out but we still got a receipt — check its status
           if (receipt?.status === 1) {
             setTxState('success');
+            setTransactions((current) => reconcileOptimisticTransaction(current, txHashValue, 'ok'));
             void refreshTransactionHistory();
           } else if (receipt?.status === 0) {
             setTxState('error');
             setTxErrorDetail('Transaction reverted on-chain.');
+            rollbackOptimisticSend(sendOptimistic);
+            setTransactions((current) => reconcileOptimisticTransaction(current, txHashValue, 'error'));
+            void refreshTransactionHistory();
           } else {
             // Receipt without clear status after timeout — leave in confirming with timed-out flag
             setTxState('confirming');
           }
         } else if (receipt?.status === 1) {
           setTxState('success');
+          // Confirmed: flip the synthesized item to 'ok' right away; the
+          // explorer fetch below then supersedes it with the real record
+          // (real timestamp, confirmations, …) via hash dedupe.
+          setTransactions((current) => reconcileOptimisticTransaction(current, txHashValue, 'ok'));
           void refreshTransactionHistory();
         } else if (receipt?.status === 0) {
           setTxState('error');
           setTxErrorDetail('Transaction reverted on-chain.');
+          // Reverted: restore the exact pre-send balances captured before the
+          // optimistic decrement, and keep the history entry visible as failed.
+          rollbackOptimisticSend(sendOptimistic);
+          setTransactions((current) => reconcileOptimisticTransaction(current, txHashValue, 'error'));
           void refreshTransactionHistory();
         } else {
           // No receipt or unknown status

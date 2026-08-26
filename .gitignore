@@ -8,6 +8,8 @@ node_modules/
 .parcel-cache/
 .nyc_output/
 *.tsbuildinfo
+/vite.config.js
+/vite.config.d.ts
 
 # Environment files
 .env
