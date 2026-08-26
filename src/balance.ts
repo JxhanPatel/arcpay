@@ -61,6 +61,34 @@ export const getAssetDecimals = (symbol?: string) => {
   return 18;
 };
 
+// Placeholder testnet pricing for non-stable assets.
+// Blockscout's `exchange_rate` field is currently always null on this deployment,
+// so we use static mock prices. Replace with a real price oracle when available.
+const MOCK_NON_STABLE_USD_PRICES: Record<string, number> = {
+  CIRBTC: 65000,
+};
+
+export const getAssetUsdPrice = (symbol: string): number | null => {
+  const normalized = String(symbol ?? '').toUpperCase();
+  if (isStableUsdPegged(normalized)) {
+    return 1;
+  }
+  const price = MOCK_NON_STABLE_USD_PRICES[normalized];
+  return Number.isFinite(price) ? price : null;
+};
+
+export const getAssetUsdValue = (symbol: string, balance: string): number | null => {
+  const price = getAssetUsdPrice(symbol);
+  if (price === null) {
+    return null;
+  }
+  const numericBalance = Number.parseFloat(String(balance).replace(/,/g, ''));
+  if (!Number.isFinite(numericBalance)) {
+    return null;
+  }
+  return price * numericBalance;
+};
+
 export const parseTransactionDirection = (walletAddress: string, from: string, to: string) => {
   const normalizedWallet = String(walletAddress ?? '').toLowerCase();
   const normalizedFrom = String(from ?? '').toLowerCase();

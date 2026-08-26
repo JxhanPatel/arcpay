@@ -34,6 +34,7 @@ import {
   formatDisplayBalance,
   formatTokenBalance,
   getAssetDecimals,
+  getAssetUsdValue,
   getTransactionDisplayMeta,
   isStableUsdPegged,
   parseNativeBalance,
@@ -1924,11 +1925,8 @@ function App() {
   const totalPortfolioValue = useMemo(() => {
     return formatDisplayBalance(
       visibleAssets.reduce((total, asset) => {
-        if (!isStableUsdPegged(asset.symbol)) {
-          return total;
-        }
-        const numericBalance = Number.parseFloat(asset.balance.replace(/,/g, ''));
-        return total + (Number.isFinite(numericBalance) ? numericBalance : 0);
+        const value = getAssetUsdValue(asset.symbol, asset.balance);
+        return total + (value ?? 0);
       }, 0),
     );
   }, [visibleAssets]);
@@ -2201,7 +2199,11 @@ function App() {
           </div>
           {visibleAssets.length > 0 ? (
             <div className="space-y-1">
-              {visibleAssets.map((asset) => (
+              {visibleAssets.map((asset) => {
+                const usdEstimate = !isStableUsdPegged(asset.symbol)
+                  ? getAssetUsdValue(asset.symbol, asset.balance)
+                  : null;
+                return (
                 <button
                   key={asset.key}
                   type="button"
@@ -2225,6 +2227,9 @@ function App() {
                       <p className="text-sm font-bold text-[#FAFAFA]">{asset.symbol}</p>
                       {/* TODO: APY badge once yield data is available */}
                       <p className="text-xs text-[#A1A1AA]">{asset.balance} available</p>
+                      {usdEstimate !== null && (
+                        <p className="text-[10px] text-[#A1A1AA]">≈${formatDisplayBalance(usdEstimate)}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -2232,7 +2237,8 @@ function App() {
                     <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-[#A1A1AA]">No balances above zero yet.</p>

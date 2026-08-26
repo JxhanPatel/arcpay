@@ -5,6 +5,8 @@ import {
   formatDisplayBalance,
   formatTokenBalance,
   getAssetDecimals,
+  getAssetUsdPrice,
+  getAssetUsdValue,
   getTransactionDisplayMeta,
   isStableUsdPegged,
   parseNativeBalance,
@@ -283,4 +285,73 @@ describe('parseNativeBalance', () => {
     // These are different balances - native coin_balance vs USDC token balance
     expect(nativeResult?.coinBalanceFormatted).not.toBe(tokenResult[0]?.balanceFormatted);
   });
+
+describe('getAssetUsdPrice', () => {
+  it('returns the mock price for cirBTC (case-insensitive)', () => {
+    expect(getAssetUsdPrice('cirBTC')).toBe(65000);
+    expect(getAssetUsdPrice('CIRBTC')).toBe(65000);
+  });
+
+  it('returns 1 for stable USD-pegged assets', () => {
+    expect(getAssetUsdPrice('USDC')).toBe(1);
+    expect(getAssetUsdPrice('EURC')).toBe(1);
+  });
+
+  it('returns null for unknown or unpriced symbols', () => {
+    expect(getAssetUsdPrice('ARC')).toBeNull();
+    expect(getAssetUsdPrice('UNKNOWNTOKEN')).toBeNull();
+  });
+});
+
+describe('getAssetUsdValue', () => {
+  it('returns price * balance for priced assets', () => {
+    expect(getAssetUsdValue('cirBTC', '0.0002')).toBe(13);
+  });
+
+  it('returns null for symbols with no price', () => {
+    expect(getAssetUsdValue('ARC', '10')).toBeNull();
+  });
+
+  it('returns balance unchanged (price=1) for stable assets', () => {
+    expect(getAssetUsdValue('USDC', '38.894348')).toBe(38.894348);
+  });
+
+  it('returns null for non-numeric balances without NaN leakage', () => {
+    expect(getAssetUsdValue('cirBTC', 'not-a-number')).toBeNull();
+  });
+});
+
+describe('portfolio value calculation with mixed assets (new pricing)', () => {
+  it('sums USD values across all priced assets, treating unpriced assets as $0', () => {
+    const mixedAssets = [
+      { key: 'usdc', symbol: 'USDC', balance: '38.894348', decimals: 6 },
+      { key: 'eurc', symbol: 'EURC', balance: '39.000000', decimals: 6 },
+      { key: 'cirbtc', symbol: 'cirBTC', balance: '0.0002', decimals: 8 },
+      { key: 'arc', symbol: 'ARC', balance: '100', decimals: 18 },
+    ];
+
+    // Mimics the App.tsx totalPortfolioValue reduce using getAssetUsdValue
+    const portfolioValue = mixedAssets.reduce((total, asset) => {
+      const value = getAssetUsdValue(asset.symbol, asset.balance);
+      return total + (value ?? 0);
+    }, 0);
+
+    // USDC: 38.894348 * 1 = 38.894348
+    // EURC: 39.000000 * 1 = 39.000000
+    // cirBTC: 0.0002 * 65000 = 13
+    // ARC: null -> 0
+    // Total: 38.894348 + 39.000000 + 13 = 90.894348
+    const stableUSDCEURCsum = 38.894348 + 39.0;
+    const cirBTCEstimate = 0.0002 * 65000;
+    expect(portfolioValue).toBeCloseTo(stableUSDCEURCsum + cirBTCEstimate, 6);
+
+    // Formatted for display
+    const formattedPortfolioValue = formatDisplayBalance(portfolioValue);
+    expect(formattedPortfolioValue).toBe('90.89');
+
+    // ARC must not break or poison the sum
+    expect(Number.isFinite(portfolioValue)).toBe(true);
+  });
+});
+
 });
