@@ -50,10 +50,12 @@ import {
 } from './contacts';
 import { resolveArcName } from './utils/arcName';
 import {
-  decryptPrivateKeyWithPin,
-  encryptPrivateKeyWithPin,
+  decryptPrivateKey,
+  encryptPrivateKey,
   getVaultFromStorage,
+  parseVaultPayload,
   removeVaultFromStorage,
+  serializeVaultPayload,
   setVaultInStorage,
 } from './utils/pinVault';
 import {
@@ -600,6 +602,13 @@ function App() {
 
   // Wallet security / screen-flow state
   const [appState, setAppState] = useState<AppScreenState>(() => {
+    // A valid encrypted vault under `arc_wallet_pk` means a wallet exists on
+    // this device — start locked and require the PIN. A leftover plaintext
+    // value from before the vault existed is NOT a valid vault and falls
+    // through to the create/import screen instead of crashing.
+    if (parseVaultPayload(getVaultFromStorage() ?? '')) {
+      return 'unlock';
+    }
     if (getKeystoreForAccount(getActiveAccountIndex()) ?? getKeystoreFromStorage()) {
       return 'unlock';
     }
@@ -726,19 +735,32 @@ function App() {
     ]);
   };
 
-  // Handle wallet unlock with PIN
+  // Handle wallet unlock with PIN. The AES-GCM vault payload stored under
+  // `arc_wallet_pk` is the primary source of truth for the active account;
+  // the ethers keystore path remains as a fallback for devices whose data
+  // predates the vault.
   const handleUnlock = async (pin: string) => {
     setIsProcessing(true);
     setPasscodeError(null);
 
     try {
-      const activeIndex = getActiveAccountIndex();
-      const keystore = getKeystoreForAccount(activeIndex) ?? getKeystoreFromStorage();
-      if (!keystore) {
-        throw new Error('Keystore not found');
+      const vaultRaw = getVaultFromStorage();
+      const vaultPayload = vaultRaw ? parseVaultPayload(vaultRaw) : null;
+
+      let decryptedWallet: ethers.Wallet;
+      if (vaultPayload) {
+        const privateKeyValue = await decryptPrivateKey(vaultPayload, pin);
+        decryptedWallet = new ethers.Wallet(privateKeyValue);
+      } else {
+        const activeIndex = getActiveAccountIndex();
+        const keystore = getKeystoreForAccount(activeIndex) ?? getKeystoreFromStorage();
+        if (!keystore) {
+          throw new Error('Keystore not found');
+        }
+
+        decryptedWallet = await decryptWallet(keystore, pin);
       }
 
-      const decryptedWallet = await decryptWallet(keystore, pin);
       const connectedWallet = decryptedWallet.connect(provider);
       // Cache the mnemonic in memory for this unlocked session so HD accounts can be
       // derived later without re-prompting for the PIN. Legacy private-key-only
@@ -762,8 +784,9 @@ function App() {
         setAccounts(getStoredAccountsMeta());
       }
     } catch {
-      // Don't leak whether the keystore is malformed vs password is wrong
-      setPasscodeError('Incorrect PIN or corrupted wallet');
+      // Never reveal whether the PIN was wrong vs. the stored data being
+      // corrupted — both paths fail identically.
+      setPasscodeError('Incorrect PIN. Try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -851,8 +874,10 @@ function App() {
       try {
         if (!pendingPrivateKey || !pendingWallet) throw new Error('No pending wallet');
 
-        const vault = await encryptPrivateKeyWithPin(pendingPrivateKey, pin);
-        setVaultInStorage(vault);
+        // Encrypt the private key into the PIN vault (AES-GCM via Web Crypto).
+        // Only this ciphertext ever touches localStorage — never the plaintext key.
+        const vaultPayload = await encryptPrivateKey(pendingPrivateKey, pin);
+        setVaultInStorage(serializeVaultPayload(vaultPayload));
 
         const keystore = await encryptWallet(pendingPrivateKey, pin);
         setKeystoreInStorage(keystore);
@@ -937,6 +962,10 @@ function App() {
       ];
       setKeystoreForAccount(nextIndex, keystore);
       saveAccountsMeta(nextAccounts);
+      // Keep the PIN vault in sync with the newly active account so the next
+      // unlock restores this exact account.
+      const vaultPayload = await encryptPrivateKey(derived.privateKey, sessionPinRef.current);
+      setVaultInStorage(serializeVaultPayload(vaultPayload));
       // Optimistic UI update — accounts list reflects the new entry immediately.
       setAccounts(nextAccounts);
       setActiveAccountIndexWithState(nextIndex);
@@ -961,6 +990,10 @@ function App() {
 
     const decrypted = await decryptWallet(keystore, sessionPinRef.current);
     const connectedWallet = decrypted.connect(provider);
+    // Keep the PIN vault in sync with the newly active account so the next
+    // unlock restores this exact account.
+    const vaultPayload = await encryptPrivateKey(decrypted.privateKey, sessionPinRef.current);
+    setVaultInStorage(serializeVaultPayload(vaultPayload));
     setWallet(connectedWallet);
     setActiveAccountIndexWithState(index);
     void refreshWalletData(connectedWallet);
@@ -996,8 +1029,11 @@ function App() {
     const nextKeystore = getKeystoreForAccount(result.activeIndex);
     if (nextKeystore && sessionPinRef.current) {
       void decryptWallet(nextKeystore, sessionPinRef.current)
-        .then((decrypted) => {
+        .then(async (decrypted) => {
           const connectedWallet = decrypted.connect(provider);
+          // Keep the PIN vault in sync with the remaining active account.
+          const vaultPayload = await encryptPrivateKey(decrypted.privateKey, sessionPinRef.current);
+          setVaultInStorage(serializeVaultPayload(vaultPayload));
           setWallet(connectedWallet);
           void refreshWalletData(connectedWallet);
         })

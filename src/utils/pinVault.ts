@@ -1,13 +1,36 @@
+/**
+ * PIN-encrypted vault for the ArcPay wallet private key.
+ *
+ * The private key NEVER touches persistent storage in plaintext form:
+ * - The encryption key is derived from the user's PIN using PBKDF2
+ *   (SHA-256, 100,000 iterations) with a random per-wallet salt.
+ * - The private key is encrypted with AES-GCM (256-bit key) using a fresh
+ *   random IV for every encryption.
+ * - Only the resulting ciphertext plus its salt and IV (neither of which is
+ *   secret) is persisted, as a JSON payload under the long-standing
+ *   `arc_wallet_pk` localStorage key. The shape of the stored value changed
+ *   from a raw hex string to this encrypted payload — the key name did not.
+ *
+ * Uses only the browser-native Web Crypto API (`window.crypto.subtle`,
+ * `window.crypto.getRandomValues`) — no external dependencies.
+ */
+
+const VAULT_STORAGE_KEY = 'arc_wallet_pk';
+const PBKDF2_ITERATIONS = 100_000;
+const SALT_BYTES = 16;
+const IV_BYTES = 12; // 96-bit IV is the recommended size for AES-GCM
+
+/** Generic failure message — deliberately does not distinguish a wrong PIN
+ * from corrupted data, and never leaks Web Crypto internals. */
+const DECRYPTION_FAILED_MESSAGE = 'Vault decryption failed.';
+
 export type EncryptedVaultPayload = {
-  v: number;
-  salt: string;
-  iv: string;
-  ciphertext: string;
+  salt: string; // base64
+  iv: string; // base64
+  ciphertext: string; // base64
 };
 
-const VAULT_STORAGE_KEY = 'arc_wallet_vault';
-
-const arrayBufferToBase64 = (buffer: ArrayBuffer | Uint8Array<ArrayBuffer>): string => {
+const toBase64 = (buffer: ArrayBuffer | Uint8Array): string => {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -16,82 +39,156 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer | Uint8Array<ArrayBuffer>): str
   return btoa(binary);
 };
 
-const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binary = atob(base64);
+const fromBase64 = (value: string): Uint8Array<ArrayBuffer> => {
+  const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes.buffer as ArrayBuffer;
+  return bytes;
 };
 
-const deriveKey = async (pin: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> => {
-  const encoder = new TextEncoder();
+/**
+ * Derives an AES-GCM CryptoKey from a PIN string and a salt.
+ * PBKDF2 with SHA-256 and 100,000 iterations.
+ */
+export async function deriveVaultKey(
+  pin: string,
+  salt: Uint8Array<ArrayBuffer>,
+): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(pin),
+    new TextEncoder().encode(pin),
     'PBKDF2',
     false,
-    ['deriveKey']
+    ['deriveKey'],
   );
 
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
       salt,
-      iterations: 100000,
+      iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
-};
+}
 
-export const encryptPrivateKeyWithPin = async (privateKey: string, pin: string): Promise<string> => {
-  const salt = crypto.getRandomValues(new Uint8Array(16)) as Uint8Array<ArrayBuffer>;
-  const iv = crypto.getRandomValues(new Uint8Array(12)) as Uint8Array<ArrayBuffer>;
-  const key = await deriveKey(pin, salt);
+/**
+ * Encrypts a private key string with a freshly generated salt + IV.
+ * Returns a JSON-serializable payload ready for localStorage.
+ */
+export async function encryptPrivateKey(
+  privateKey: string,
+  pin: string,
+): Promise<EncryptedVaultPayload> {
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const key = await deriveVaultKey(pin, salt as Uint8Array<ArrayBuffer>);
 
-  const encoder = new TextEncoder();
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
+    { name: 'AES-GCM', iv },
     key,
-    encoder.encode(privateKey)
+    new TextEncoder().encode(privateKey),
   );
 
-  const payload: EncryptedVaultPayload = {
-    v: 1,
-    salt: arrayBufferToBase64(salt),
-    iv: arrayBufferToBase64(iv),
-    ciphertext: arrayBufferToBase64(ciphertext),
+  return {
+    salt: toBase64(salt),
+    iv: toBase64(iv),
+    ciphertext: toBase64(ciphertext),
   };
+}
 
-  return JSON.stringify(payload);
-};
+/**
+ * Decrypts a stored payload with the given PIN.
+ * Throws a generic Error (never leaking crypto internals) if the PIN is wrong
+ * or the payload is malformed/corrupted — both fail exactly the same way,
+ * because AES-GCM auth tag verification rejects either case.
+ */
+export async function decryptPrivateKey(
+  payload: EncryptedVaultPayload,
+  pin: string,
+): Promise<string> {
+  let salt: Uint8Array<ArrayBuffer>;
+  let iv: Uint8Array<ArrayBuffer>;
+  let ciphertext: Uint8Array<ArrayBuffer>;
 
-export const decryptPrivateKeyWithPin = async (vaultJson: string, pin: string): Promise<string> => {
-  const payload = JSON.parse(vaultJson) as EncryptedVaultPayload;
-  if (payload.v !== 1) {
-    throw new Error('Unsupported vault version');
+  try {
+    salt = fromBase64(payload.salt);
+    iv = fromBase64(payload.iv);
+    ciphertext = fromBase64(payload.ciphertext);
+  } catch {
+    // Malformed base64 anywhere in the payload is treated identically to a
+    // wrong PIN — no information about *what* failed escapes this module.
+    throw new Error(DECRYPTION_FAILED_MESSAGE);
   }
 
-  const salt = new Uint8Array(base64ToArrayBuffer(payload.salt)) as Uint8Array<ArrayBuffer>;
-  const iv = new Uint8Array(base64ToArrayBuffer(payload.iv)) as Uint8Array<ArrayBuffer>;
-  const ciphertext = base64ToArrayBuffer(payload.ciphertext);
+  try {
+    const key = await deriveVaultKey(pin, salt as Uint8Array<ArrayBuffer>);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext,
+    );
+    return new TextDecoder().decode(plaintext);
+  } catch {
+    throw new Error(DECRYPTION_FAILED_MESSAGE);
+  }
+}
 
-  const key = await deriveKey(pin, salt);
+/** Serializes the payload to the exact string format persisted in localStorage. */
+export function serializeVaultPayload(payload: EncryptedVaultPayload): string {
+  return JSON.stringify({
+    salt: payload.salt,
+    iv: payload.iv,
+    ciphertext: payload.ciphertext,
+  });
+}
 
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
-    key,
-    ciphertext
-  );
+/**
+ * Parses a raw localStorage string back into a payload.
+ * Returns null (never throws) for anything that is not a well-formed vault
+ * payload — including leftover plaintext private keys from before this vault
+ * existed. Callers treat null as "no valid vault found".
+ */
+export function parseVaultPayload(raw: string): EncryptedVaultPayload | null {
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    return null;
+  }
 
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
-};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+
+    const candidate = parsed as Partial<Record<string, unknown>>;
+    if (
+      typeof candidate.salt !== 'string' ||
+      candidate.salt === '' ||
+      typeof candidate.iv !== 'string' ||
+      candidate.iv === '' ||
+      typeof candidate.ciphertext !== 'string' ||
+      candidate.ciphertext === ''
+    ) {
+      return null;
+    }
+
+    return {
+      salt: candidate.salt,
+      iv: candidate.iv,
+      ciphertext: candidate.ciphertext,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// --- localStorage helpers -------------------------------------------------
 
 export const getVaultFromStorage = (): string | null => {
   try {
@@ -105,7 +202,7 @@ export const setVaultInStorage = (vaultJson: string): void => {
   try {
     localStorage.setItem(VAULT_STORAGE_KEY, vaultJson);
   } catch {
-    // Ignore write failures
+    // Ignore write failures (e.g. quota exceeded / storage disabled)
   }
 };
 
@@ -113,6 +210,6 @@ export const removeVaultFromStorage = (): void => {
   try {
     localStorage.removeItem(VAULT_STORAGE_KEY);
   } catch {
-    // Ignore
+    // Ignore removal failures
   }
 };
