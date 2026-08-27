@@ -441,7 +441,7 @@ const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
   },
   pending: {
     label: 'Pending',
-    className: 'border-[#27272A] bg-[#161616] text-[#A1A1AA]',
+    className: 'border-white/[0.06] bg-[#16171C] text-[#A1A1AA]',
   },
   confirming: {
     label: 'Confirming',
@@ -654,18 +654,18 @@ const PasscodePad = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+        <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
       </div>
-      <div className="relative w-full max-w-sm rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+      <div className="relative w-full max-w-sm rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
         <div className="mb-8 flex items-center gap-3">
-          <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
-            <Lock className="h-5 w-5 text-[#3B82F6]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
+            <Lock className="h-5 w-5 text-[#8B5CF6]" />
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Security</p>
-            <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">{title}</h1>
+            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Security</p>
+            <h1 className="text-lg font-semibold">{title}</h1>
           </div>
         </div>
 
@@ -677,8 +677,8 @@ const PasscodePad = ({
           {Array.from({ length: 6 }).map((_, index) => (
             <span
               key={index}
-              className={`h-3 w-3 rounded-full border ${
-                pin.length > index ? 'border-[#3B82F6] bg-[#3B82F6]' : 'border-[#27272A] bg-[#161616]'
+              className={`h-3 w-3 rounded-full border transition-fast ${
+                pin.length > index ? 'border-[#8B5CF6] bg-[#8B5CF6]' : 'border-white/[0.08] bg-[#16171C]'
               }`}
             />
           ))}
@@ -692,7 +692,7 @@ const PasscodePad = ({
               key={digit}
               type="button"
               onClick={() => handleDigit(digit)}
-              className="rounded-xl border border-[#27272A] bg-[#161616] py-3 text-lg font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+              className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
             >
               {digit}
             </button>
@@ -701,14 +701,14 @@ const PasscodePad = ({
             type="button"
             onClick={handleBackspace}
             aria-label="Delete last digit"
-            className="rounded-xl border border-[#27272A] bg-[#161616] py-3 text-lg text-[#A1A1AA] transition hover:border-[#3B82F6]"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/40/40"
           >
             ⌫
           </button>
           <button
             type="button"
             onClick={() => handleDigit('0')}
-            className="rounded-xl border border-[#27272A] bg-[#161616] py-3 text-lg font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
           >
             0
           </button>
@@ -716,7 +716,7 @@ const PasscodePad = ({
             type="button"
             onClick={() => onComplete(pin)}
             disabled={pin.length < 6}
-            className="rounded-xl bg-[#3B82F6] py-3 text-sm font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-50"
+            className="press-effect rounded-[14px] bg-[#8B5CF6] py-3 text-sm font-medium text-white transition-normal hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>
@@ -1965,24 +1965,24 @@ function App() {
     };
 
     return (
-      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+      <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
         </div>
-        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
           <div className="mb-8 flex items-center gap-3">
-            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
-              <Wallet className="h-5 w-5 text-[#3B82F6]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#8B5CF6]" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Backup</p>
-              <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Save your recovery phrase</h1>
+              <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Backup</p>
+              <h1 className="text-lg font-semibold">Save your recovery phrase</h1>
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <p className="text-sm text-[#A1A1AA]">
+              <p className="text-[14px] text-[#A1A1AA]">
                 This is your 12-word recovery phrase. Write it down and store it securely. This is the only way to recover your wallet if you lose access to this device.
               </p>
               
@@ -1990,9 +1990,9 @@ function App() {
                 {mnemonicWords.map((word, index) => (
                   <div 
                     key={index} 
-                    className="flex items-center gap-2 rounded-lg border border-[#27272A] bg-[#161616] px-3 py-2 text-sm text-[#FAFAFA]"
+                    className="flex items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#16171C] px-3 py-2 text-sm text-[#F5F3FF]"
                   >
-                    <span className="text-[#A1A1AA] text-xs font-medium w-5">{index + 1}.</span>
+                    <span className="text-[#71717A] text-xs font-medium w-5">{index + 1}.</span>
                     <span>{word}</span>
                   </div>
                 ))}
@@ -2002,7 +2002,7 @@ function App() {
                 <button
                   type="button"
                   onClick={copyMnemonic}
-                  className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40"
                 >
                   <Copy className="h-4 w-4" />
                   {copiedPhrase ? 'Copied!' : 'Copy phrase'}
@@ -2017,9 +2017,9 @@ function App() {
                   id="confirmMnemonic"
                   checked={hasConfirmedMnemonicSave}
                   onChange={(e) => setHasConfirmedMnemonicSave(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-[#27272A] bg-[#0a0a0a] text-[#3B82F6] focus:ring-[#3B82F6] focus:ring-offset-0"
+                  className="mt-1 h-4 w-4 rounded border-white/[0.08] bg-[#0B0C11] text-[#8B5CF6] focus:ring-[#8B5CF6] focus:ring-offset-0"
                 />
-                <label htmlFor="confirmMnemonic" className="text-sm text-[#A1A1AA]">
+                <label htmlFor="confirmMnemonic" className="text-[14px] text-[#A1A1AA]">
                   I have saved my recovery phrase somewhere safe.
                 </label>
               </div>
@@ -2028,7 +2028,7 @@ function App() {
                 type="button"
                 onClick={handleConfirmMnemonicSave}
                 disabled={!hasConfirmedMnemonicSave}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:opacity-70"
+                className="press-effect w-full flex items-center justify-center gap-2 rounded-[14px] bg-[#8B5CF6] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#7C3AED] disabled:opacity-70"
               >
                 Continue
               </button>
@@ -2044,49 +2044,49 @@ function App() {
   // No wallet - show create/import screen
   if (appState === 'setup' && !wallet) {
     return (
-      <div className="min-h-screen bg-[#050505] text-[#FAFAFA] flex items-center justify-center px-4 py-10">
+      <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
+          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
         </div>
-        <div className="relative w-full max-w-md rounded-2xl border border-[#27272A] bg-[#121212]/80 p-8 shadow-[0_0_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
           <div className="mb-8 flex items-center gap-3">
-            <div className="rounded-full border border-[#27272A] bg-[#161616] p-2">
-              <Wallet className="h-5 w-5 text-[#3B82F6]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#8B5CF6]" />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-[#A1A1AA]">Self-custodial</p>
-              <h1 className="text-xl font-semibold tracking-tight">Arc Wallet</h1>
+              <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Self-custodial</p>
+              <h1 className="text-lg font-semibold">Arc Wallet</h1>
             </div>
           </div>
 
           <div className="mb-6 space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight">Secure your Arc Testnet wallet</h2>
-            <p className="text-sm text-[#A1A1AA]">Create a fresh wallet or import an existing one directly in your browser.</p>
+            <h2 className="text-2xl font-bold tracking-tight">Secure your Arc Testnet wallet</h2>
+            <p className="text-[14px] text-[#A1A1AA]">Create a fresh wallet or import an existing one directly in your browser.</p>
           </div>
 
           <div className="space-y-3">
             <button
               onClick={handleCreateWallet}
               disabled={isLoading || isProcessing}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB]"
+              className="press-effect flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#8B5CF6] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#7C3AED]"
             >
               <Download className="h-4 w-4" />
               {isLoading || isProcessing ? 'Preparing…' : 'Create New Wallet'}
             </button>
 
-            <div className="rounded-xl border border-[#27272A] bg-[#161616]/70 p-4">
-              <label className="mb-2 block text-[11px] uppercase tracking-[0.32em] text-[#A1A1AA]">Import wallet</label>
+            <div className="rounded-[14px] border border-white/[0.06] bg-[#16171C]/60 p-4">
+              <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Import wallet</label>
               <textarea
                 value={importInput}
                 onChange={(e) => setImportInput(e.target.value)}
                 rows={4}
                 placeholder="12-word seed phrase or 0x private key"
-                className="w-full rounded-lg border border-[#27272A] bg-[#0a0a0a] px-3 py-2 text-sm text-[#FAFAFA] outline-none ring-0"
+                className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus:border-[#8B5CF6]/30 transition-fast"
               />
               <button
                 onClick={handleImportWallet}
                 disabled={isLoading || isProcessing}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#27272A] bg-[#121212] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#111216] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
               >
                 <Upload className="h-4 w-4" />
                 Import Wallet
@@ -2103,102 +2103,109 @@ function App() {
   if (appState !== 'dashboard' && !wallet) return null;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] px-4 py-5 pb-28 sm:px-6 lg:px-8">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 right-0 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl" />
-      </div>
-      <div className="relative mx-auto flex max-w-md flex-col gap-4">
-        <header className="flex items-center justify-between border-b border-[#27272A] pb-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#161616] p-1.5">
-              <img src={logoUrl} alt="ArcPay" className="h-full w-full object-contain" />
-            </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.32em] text-[#A1A1AA]">Arc Network</p>
-              <h1 className="text-lg font-semibold tracking-tight">ArcPay</h1>
+    <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] px-4 pt-3 pb-28 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex max-w-md flex-col gap-5">
+        {/* Header */}
+        <header className="flex items-center justify-between py-1.5">
+          <div className="flex items-center gap-2.5">
+            <img src={logoUrl} alt="ArcPay" className="h-7 w-7 object-contain" />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Arc Network</span>
+              <span className="text-[13px] font-semibold">ArcPay</span>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={copyAddress}
-              className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]"
+              className="group flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#111216] px-3 py-1.5 transition-fast hover:border-white/[0.12]"
               aria-label="Copy wallet address"
             >
-              <span className="font-mono">{address.slice(0, 6)}...{address.slice(-4)}</span>
-              <Copy className="h-3.5 w-3.5 text-[#A1A1AA]" />
+              <span className="font-mono text-[11px] text-[#A1A1AA] transition-fast group-hover:text-[#F5F3FF]">
+                {address.slice(0, 6)}…{address.slice(-4)}
+              </span>
+              <Copy className="h-3.5 w-3.5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
             </button>
             <button
               onClick={handleLock}
-              className="rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA]"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#71717A] transition-fast hover:border-white/[0.12] hover:text-[#F5F3FF]"
               aria-label="Lock wallet"
             >
-              <Lock className="h-4 w-4" />
+              <Lock className="h-3.5 w-3.5" />
             </button>
           </div>
         </header>
 
-        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Total balance</p>
-              <h2 className="mt-2 text-4xl font-bold tracking-tight">${totalPortfolioValue}</h2>
-              <p className="mt-2 text-xs text-[#A1A1AA]">Testnet · {ARC_NETWORK_NAME}</p>
-              {/* TODO: sparkline once portfolio history endpoint exists */}
+        {/* Total Balance Card */}
+        <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#111216] px-6 py-8">
+          {/* Subtle purple ambient glow */}
+          <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#8B5CF6]/[0.06] blur-3xl" />
+          <div className="pointer-events-none absolute -left-4 bottom-0 h-24 w-24 rounded-full bg-[#8B5CF6]/[0.04] blur-2xl" />
+          <div className="relative">
+            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Total Balance</p>
+            <h2 className="mt-3 text-[40px] font-bold leading-none tracking-tight text-[#F5F3FF]">
+              ${totalPortfolioValue}
+            </h2>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="text-[12px] text-[#71717A]">Testnet · {ARC_NETWORK_NAME}</span>
+              <button
+                onClick={() => void refreshWalletData()}
+                className="group flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] transition-fast hover:border-[#8B5CF6]/30 hover:bg-[#8B5CF6]/[0.08]"
+                aria-label="Refresh"
+              >
+                <RefreshCcw className="h-3 w-3 text-[#71717A] transition-fast group-hover:text-[#A78BFA]" />
+              </button>
             </div>
-            <button
-              onClick={() => void refreshWalletData()}
-              className="flex items-center justify-center rounded-full border border-[#27272A] bg-[#161616] h-9 w-9 shrink-0"
-              aria-label="Refresh"
-            >
-              <RefreshCcw className="h-4 w-4 text-[#A1A1AA]" />
-            </button>
-          </div>
-          {/* showAssetBreakdown chip row removed — the holdings list below always shows the full asset list */}
-        </section>
-
-        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
-          <div className="grid grid-cols-5 gap-2">
-            <button onClick={() => openSendModal()} className="flex flex-col items-center gap-2">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
-                <Send className="h-5 w-5" />
-              </span>
-              <span className="text-xs text-[#A1A1AA]">Send</span>
-            </button>
-            <button onClick={() => setShowReceive(true)} className="flex flex-col items-center gap-2">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
-                <Download className="h-5 w-5" />
-              </span>
-              <span className="text-xs text-[#A1A1AA]">Receive</span>
-            </button>
-            <button onClick={openRequestModal} className="flex flex-col items-center gap-2">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
-                <QrCode className="h-5 w-5" />
-              </span>
-              <span className="text-xs text-[#A1A1AA]">Request</span>
-            </button>
-            <button onClick={() => setShowHistory(true)} className="flex flex-col items-center gap-2">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
-                <Clock className="h-5 w-5" />
-              </span>
-              <span className="text-xs text-[#A1A1AA]">History</span>
-            </button>
-            <button onClick={() => setShowScanner(true)} className="flex flex-col items-center gap-2">
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA]">
-                <ScanLine className="h-5 w-5" />
-              </span>
-              <span className="text-xs text-[#A1A1AA]">Scan</span>
-            </button>
           </div>
         </section>
 
-        <section className="rounded-xl border border-[#27272A] bg-[#121212]/80 p-4">
-          <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-3">
-            <p className="text-[10px] uppercase tracking-[0.28em] text-[#A1A1AA]">Holdings</p>
-            <span className="text-[11px] text-[#A1A1AA]">{visibleAssets.length} assets</span>
+        {/* Quick Actions */}
+        <section className="flex items-center justify-between px-2">
+          <button
+            onClick={() => openSendModal()}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+              <Send className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Send</span>
+          </button>
+          <button
+            onClick={() => setShowReceive(true)}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+              <Download className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Receive</span>
+          </button>
+          <button
+            onClick={openRequestModal}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+              <QrCode className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Request</span>
+          </button>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+              <Clock className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">History</span>
+          </button>
+        </section>
+
+        {/* Holdings */}
+        <section className="rounded-[16px] border border-white/[0.06] bg-[#111216] px-4 py-4">
+          <div className="mb-1 flex items-center justify-between px-2">
+            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Holdings</p>
+            <span className="text-[11px] text-[#71717A]">{visibleAssets.length} assets</span>
           </div>
           {visibleAssets.length > 0 ? (
-            <div className="space-y-1">
+            <div className="divide-y divide-white/[0.04]">
               {visibleAssets.map((asset) => {
                 const usdEstimate = !isStableUsdPegged(asset.symbol)
                   ? getAssetUsdValue(asset.symbol, asset.balance)
@@ -2208,44 +2215,45 @@ function App() {
                   key={asset.key}
                   type="button"
                   onClick={() => setSelectedAssetDetail(asset.key)}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-3 text-left transition hover:bg-[#161616]"
+                  className="group flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-3.5 text-left transition-fast hover:bg-[#8B5CF6]/[0.04]"
                 >
                   <div className="flex items-center gap-3">
                     <img
                       src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
                       alt={`${asset.symbol} icon`}
-                      className="h-10 w-10 rounded-full"
+                      className="h-9 w-9 rounded-full"
                       onError={(event) => {
                         event.currentTarget.style.display = 'none';
                         const fallback = document.createElement('div');
-                        fallback.className = 'flex h-10 w-10 items-center justify-center rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 text-[11px] font-semibold text-[#93C5FD]';
+                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#8B5CF6]/20 bg-[#8B5CF6]/[0.08] text-[11px] font-semibold text-[#A78BFA]';
                         fallback.textContent = asset.symbol.slice(0, 2).toUpperCase();
                         event.currentTarget.parentElement?.appendChild(fallback);
                       }}
                     />
                     <div>
-                      <p className="text-sm font-bold text-[#FAFAFA]">{asset.symbol}</p>
-                      {/* TODO: APY badge once yield data is available */}
-                      <p className="text-xs text-[#A1A1AA]">{asset.balance} available</p>
-                      {usdEstimate !== null && (
-                        <p className="text-[10px] text-[#A1A1AA]">≈${formatDisplayBalance(usdEstimate)}</p>
-                      )}
+                      <p className="text-[14px] font-semibold text-[#F5F3FF]">{asset.symbol}</p>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        <span className="text-[12px] text-[#71717A]">{asset.balance} available</span>
+                        {usdEstimate !== null && (
+                          <span className="text-[11px] text-[#71717A]">· ≈${formatDisplayBalance(usdEstimate)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono text-sm font-semibold text-[#FAFAFA]">{asset.balance}</p>
-                    <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-mono text-[13px] font-semibold text-[#F5F3FF]">{asset.balance}</p>
+                    <ChevronRight className="h-4 w-4 text-[#71717A] transition-fast group-hover:text-[#A78BFA]" />
                   </div>
                 </button>
                 );
               })}
             </div>
           ) : (
-            <p className="text-sm text-[#A1A1AA]">No balances above zero yet.</p>
+            <p className="px-2 py-4 text-[13px] text-[#71717A]">No balances above zero yet.</p>
           )}
         </section>
 
-        {copied ? <p className="text-center text-xs text-[#3B82F6]">Address copied</p> : null}
+        {copied ? <p className="text-center text-[11px] font-medium text-[#A78BFA]">Address copied</p> : null}
       </div>
 
       {selectedAssetDetail ? (() => {
@@ -2256,7 +2264,7 @@ function App() {
 
         return (
           <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-2xl rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+            <div className="w-full max-w-2xl rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <img
@@ -2282,7 +2290,7 @@ function App() {
                     setSelectedAssetDetail(null);
                     openSendModal({ presetAssetKey: assetKey });
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#2563EB]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#8B5CF6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#7C3AED]"
                 >
                   <Send className="h-4 w-4" />
                   Send {detailAsset.symbol}
@@ -2290,9 +2298,9 @@ function App() {
               </div>
 
               <div className="mt-5">
-                <div className="mb-3 flex items-center justify-between border-b border-[#27272A] pb-2">
+                <div className="mb-3 flex items-center justify-between border-b border-white/[0.06] pb-2">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Activity</p>
-                  <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition hover:text-[#FAFAFA]">
+                  <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition hover:text-[#F5F3FF]">
                     <RefreshCcw className="h-3 w-3" />
                     Refresh
                   </button>
@@ -2301,23 +2309,23 @@ function App() {
                 <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
                   {isHistoryLoading && transactions.length === 0 ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                      <div key={index} className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#27272A]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06]">
                             <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
                           </div>
                           <div className="space-y-2">
-                            <div className="h-3 w-24 rounded-full bg-[#27272A]" />
-                            <div className="h-2.5 w-36 rounded-full bg-[#27272A]" />
+                            <div className="h-3 w-24 rounded-full bg-white/[0.06]" />
+                            <div className="h-2.5 w-36 rounded-full bg-white/[0.06]" />
                           </div>
                         </div>
-                        <div className="h-3 w-16 rounded-full bg-[#27272A]" />
+                        <div className="h-3 w-16 rounded-full bg-white/[0.06]" />
                       </div>
                     ))
                   ) : null}
 
                   {!isHistoryLoading && assetTransactions.length === 0 ? (
-                    <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-6 text-center text-sm text-[#A1A1AA]">
+                    <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-6 text-center text-sm text-[#A1A1AA]">
                       No {detailAsset.symbol} transactions yet.
                     </div>
                   ) : null}
@@ -2336,20 +2344,20 @@ function App() {
                       <button
                         key={transaction.hash}
                         onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-left transition hover:border-[#3B82F6]"
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-left transition hover:border-[#8B5CF6]/40"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
                             {directionIcon}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-[#FAFAFA]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                            <p className="text-sm font-medium text-[#F5F3FF]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
                             <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
                             <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <p className="text-sm font-semibold text-[#FAFAFA]">
+                          <p className="text-sm font-semibold text-[#F5F3FF]">
                             {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
                           </p>
                           <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
@@ -2368,11 +2376,11 @@ function App() {
 
       {showHistory ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-2xl rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-2xl rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Transaction History</h3>
               <div className="flex items-center gap-2">
-                <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#FAFAFA]">
+                <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 text-xs text-[#F5F3FF]">
                   <RefreshCcw className="h-3.5 w-3.5" />
                   Refresh
                 </button>
@@ -2383,17 +2391,17 @@ function App() {
             <div className="mt-5 space-y-3">
               {isHistoryLoading ? (
                 Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                  <div key={index} className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#27272A]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06]">
                         <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
                       </div>
                       <div className="space-y-2">
-                        <div className="h-3 w-24 rounded-full bg-[#27272A]" />
-                        <div className="h-2.5 w-36 rounded-full bg-[#27272A]" />
+                        <div className="h-3 w-24 rounded-full bg-white/[0.06]" />
+                        <div className="h-2.5 w-36 rounded-full bg-white/[0.06]" />
                       </div>
                     </div>
-                    <div className="h-3 w-16 rounded-full bg-[#27272A]" />
+                    <div className="h-3 w-16 rounded-full bg-white/[0.06]" />
                   </div>
                 ))
               ) : null}
@@ -2403,7 +2411,7 @@ function App() {
               ) : null}
 
               {!isHistoryLoading && !historyError && transactions.length === 0 ? (
-                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-6 text-sm text-[#A1A1AA]">No transactions yet.</div>
+                <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-6 text-sm text-[#A1A1AA]">No transactions yet.</div>
               ) : null}
 
               {!isHistoryLoading && !historyError && transactions.length > 0 ? (
@@ -2422,20 +2430,20 @@ function App() {
                       <button
                         key={transaction.hash}
                         onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-left transition hover:border-[#3B82F6]"
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-left transition hover:border-[#8B5CF6]/40"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
                             {directionIcon}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-[#FAFAFA]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                            <p className="text-sm font-medium text-[#F5F3FF]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
                             <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
                             <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <p className="text-sm font-semibold text-[#FAFAFA]">
+                          <p className="text-sm font-semibold text-[#F5F3FF]">
                             {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
                           </p>
                           <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
@@ -2454,7 +2462,7 @@ function App() {
 
       {showSettings ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Settings</h3>
               <button 
@@ -2473,19 +2481,19 @@ function App() {
                   setShowSettings(false);
                   setShowContacts(true);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-[#27272A] bg-[#161616] px-4 py-3 text-left text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-left text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#27272A] bg-[#121212]">
-                    <Users className="h-4 w-4 text-[#93C5FD]" />
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
+                    <Users className="h-4 w-4 text-[#A78BFA]" />
                   </div>
                   <span className="text-sm font-medium">Manage Contacts</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
               </button>
 
-              <div className="pt-4 border-t border-[#27272A]">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[#3B82F6] mb-3">Accounts</p>
+              <div className="pt-4 border-t border-white/[0.06]">
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#8B5CF6] mb-3">Accounts</p>
                 <div className="space-y-2">
                   {accounts.map((account) => {
                     const isActive = account.index === activeAccountIndex;
@@ -2493,13 +2501,13 @@ function App() {
                     const isConfirmingRemoval = confirmAccountRemoval && removalTargetIndex === account.index;
 
                     return (
-                      <div key={account.index} className="rounded-xl border border-[#27272A] bg-[#161616] p-3">
+                      <div key={account.index} className="rounded-xl border border-white/[0.06] bg-[#16171C] p-3">
                         {isEditing ? (
                           <div className="flex items-center gap-2">
                             <input
                               value={editingAccountLabel}
                               onChange={(e) => setEditingAccountLabel(e.target.value.slice(0, 40))}
-                              className="flex-1 rounded-lg border border-[#27272A] bg-[#0a0a0a] px-2 py-1.5 text-sm text-[#FAFAFA] outline-none"
+                              className="flex-1 rounded-lg border border-white/[0.06] bg-[#0B0C11] px-2 py-1.5 text-sm text-[#F5F3FF] outline-none"
                               autoFocus
                             />
                             <button
@@ -2509,7 +2517,7 @@ function App() {
                                 setEditingAccountIndex(null);
                                 setEditingAccountLabel('');
                               }}
-                              className="rounded-lg bg-[#3B82F6] px-2.5 py-1.5 text-xs font-medium text-white"
+                              className="rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-xs font-medium text-white"
                             >
                               Save
                             </button>
@@ -2528,9 +2536,9 @@ function App() {
                           <div className="flex items-center justify-between">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <p className="truncate text-sm font-medium text-[#FAFAFA]">{account.label}</p>
+                                <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
                                 {isActive && (
-                                  <span className="rounded-full bg-[#3B82F6]/20 px-2 py-0.5 text-[10px] font-medium text-[#93C5FD]">
+                                  <span className="rounded-full bg-[#8B5CF6]/20 px-2 py-0.5 text-[10px] font-medium text-[#A78BFA]">
                                     Active
                                   </span>
                                 )}
@@ -2544,7 +2552,7 @@ function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleSwitchAccountClick(account.index)}
-                                  className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                                  className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
                                 >
                                   Switch
                                 </button>
@@ -2555,7 +2563,7 @@ function App() {
                                   setEditingAccountIndex(account.index);
                                   setEditingAccountLabel(account.label);
                                 }}
-                                className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:text-[#FAFAFA]"
+                                className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:text-[#F5F3FF]"
                               >
                                 Rename
                               </button>
@@ -2587,7 +2595,7 @@ function App() {
                                       setConfirmAccountRemoval(true);
                                       setRemovalTargetIndex(account.index);
                                     }}
-                                    className="rounded-lg border border-[#27272A] bg-[#121212] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
+                                    className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
                                   >
                                     Remove
                                   </button>
@@ -2602,7 +2610,7 @@ function App() {
                 </div>
 
                 {!hasSessionSeed && addAccountHint ? (
-                  <p className="mt-3 rounded-xl border border-[#27272A] bg-[#161616] px-3 py-2 text-xs text-[#A1A1AA]">
+                  <p className="mt-3 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-xs text-[#A1A1AA]">
                     {addAccountHint}
                   </p>
                 ) : null}
@@ -2611,7 +2619,7 @@ function App() {
                   type="button"
                   onClick={() => void handleAddAccount()}
                   disabled={!hasSessionSeed || isAddingAccount}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-4 py-2.5 text-sm font-medium text-[#93C5FD] transition hover:border-[#3B82F6] hover:bg-[#3B82F6]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#8B5CF6]/20 bg-[#8B5CF6]/[0.06] px-4 py-2.5 text-sm font-medium text-[#A78BFA] transition-normal hover:border-[#8B5CF6]/40 hover:bg-[#8B5CF6]/[0.10] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isAddingAccount ? (
                     <>
@@ -2631,8 +2639,8 @@ function App() {
                 ) : null}
               </div>
 
-              <div className="pt-4 border-t border-[#27272A]">
-                <p className="text-[11px] uppercase tracking-[0.28em] text-red-400 mb-3">Danger Zone</p>
+              <div className="pt-4 border-t border-white/[0.06]">
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-red-400 mb-3">Danger Zone</p>
                 {!confirmRemoval ? (
                   <button
                     onClick={() => setConfirmRemoval(true)}
@@ -2686,7 +2694,7 @@ function App() {
                       </button>
                       <button
                         onClick={() => setConfirmRemoval(false)}
-                        className="flex-1 rounded-2xl border border-[#27272A] bg-[#161616] px-4 py-3 text-sm font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                        className="flex-1 rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
                       >
                         Cancel
                       </button>
@@ -2701,17 +2709,17 @@ function App() {
 
       {showReceive ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Receive</h3>
               <button onClick={() => setShowReceive(false)} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
             <div className="mt-6 flex flex-col items-center gap-4">
-              <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+              <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                 <QRCodeSVG value={address} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
               </div>
               <p className="break-all text-center font-mono text-sm text-[#A1A1AA]">{address}</p>
-              <button onClick={copyAddress} className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA]">
+              <button onClick={copyAddress} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]">
                 <Copy className="h-4 w-4" />
                 Copy address
               </button>
@@ -2722,7 +2730,7 @@ function App() {
 
       {showRequest ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Request</h3>
               <button onClick={() => {
@@ -2743,7 +2751,7 @@ function App() {
                     setRequestAssetKey(e.target.value);
                     setRequestAmountError('');
                   }}
-                  className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                  className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
                 >
                   {requestAssets.map((asset) => (
                     <option key={asset.key} value={asset.key}>
@@ -2755,14 +2763,14 @@ function App() {
 
               <label className="block text-sm text-[#A1A1AA]">
                 Amount
-                <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3">
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3">
                   <input
                     value={requestAmount}
                     onChange={(e) => {
                       setRequestAmount(e.target.value);
                       validateRequestAmount(e.target.value);
                     }}
-                    className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                    className="w-full bg-transparent text-sm text-[#F5F3FF] outline-none"
                     placeholder="12.50"
                   />
                   <span className="text-[11px] text-[#A1A1AA]">{selectedRequestAsset.symbol}</span>
@@ -2784,16 +2792,16 @@ function App() {
                   }}
                   rows={3}
                   maxLength={140}
-                  className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                  className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
                   placeholder="Dinner split"
                 />
                 <div className="mt-2 text-right text-[11px] text-[#A1A1AA]">{requestNote.length}/140</div>
               </label>
 
               {requestLink ? (
-                <div className="space-y-3 rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                <div className="space-y-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                    <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                       <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
                     </div>
                     <button
@@ -2805,7 +2813,7 @@ function App() {
                         window.setTimeout(() => setCopied(false), 1300);
                         window.setTimeout(() => setRequestLinkCopied(false), 1300);
                       }}
-                      className="flex items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-4 py-2 text-sm text-[#FAFAFA]"
+                      className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]"
                     >
                       {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                       {requestLinkCopied ? 'Copied' : 'Copy request link'}
@@ -2813,7 +2821,7 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
+                <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-sm text-[#A1A1AA]">
                   Enter a valid positive amount to generate a shareable request QR code and deep link.
                 </div>
               )}
@@ -2824,7 +2832,7 @@ function App() {
 
       {showScanner ? (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-5 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-5 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold">Scan QR</h3>
@@ -2833,14 +2841,14 @@ function App() {
               <button onClick={() => setShowScanner(false)} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-[#27272A] bg-[#0a0a0a]">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0B0C11]">
               <div className="relative aspect-[4/5] w-full bg-black">
                 <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
-                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#3B82F6]/80" />
+                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#8B5CF6]/80" />
                 <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20" />
                 {scannerSuccess ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#3B82F6]/10 backdrop-blur-[1px]">
-                    <div className="rounded-full border border-[#3B82F6]/40 bg-[#121212]/80 px-4 py-2 text-sm font-medium text-[#93C5FD]">
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#8B5CF6]/10 backdrop-blur-[1px]">
+                    <div className="rounded-full border border-[#8B5CF6]/40 bg-[#111216]/80 px-4 py-2 text-sm font-medium text-[#A78BFA]">
                       Scan complete
                     </div>
                   </div>
@@ -2859,14 +2867,14 @@ function App() {
 
       {showContacts ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Contacts</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsAddContactOpen(!isAddContactOpen)}
-                  className={`rounded-full border border-[#27272A] bg-[#161616] p-2 text-[#A1A1AA] transition hover:text-[#FAFAFA] ${
-                    isAddContactOpen ? 'border-[#3B82F6] bg-[#3B82F6]/10' : ''
+                  className={`rounded-full border border-white/[0.06] bg-[#16171C] p-2 text-[#A1A1AA] transition hover:text-[#F5F3FF] ${
+                    isAddContactOpen ? 'border-[#8B5CF6] bg-[#8B5CF6]/10' : ''
                   }`}
                   aria-label={isAddContactOpen ? 'Close add contact form' : 'Add contact'}
                 >
@@ -2878,7 +2886,7 @@ function App() {
 
             <div className="mt-5 space-y-4">
               {isAddContactOpen && (
-                <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                   <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
                   <div className="space-y-3">
                     <input
@@ -2889,13 +2897,13 @@ function App() {
                           setAddContactError(null);
                         }
                       }}
-                      className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                      className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none"
                       placeholder="0x... or name.arc"
                     />
                     <input
                       value={addContactLabel}
                       onChange={(e) => setAddContactLabel(e.target.value.trimStart())}
-                      className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                      className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none"
                       placeholder="Label (optional)"
                     />
 
@@ -2910,13 +2918,13 @@ function App() {
                           }
                         }}
                         disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
-                        className="rounded-xl bg-[#3B82F6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-xl bg-[#8B5CF6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Add
                       </button>
                       {addContactStatus === 'resolving' ? (
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#A78BFA]">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#8B5CF6]" />
                           Resolving…
                         </div>
                       ) : null}
@@ -2935,7 +2943,7 @@ function App() {
                   value={contactSearchQuery}
                   onChange={(e) => setContactSearchQuery(e.target.value)}
                   placeholder="Search contacts..."
-                  className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] pl-10 pr-4 py-2.5 text-sm text-[#FAFAFA] outline-none"
+                  className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] pl-10 pr-4 py-2.5 text-sm text-[#F5F3FF] outline-none"
                 />
               </div>
 
@@ -2943,13 +2951,13 @@ function App() {
               {(() => {
                 const filteredContacts = filterContacts(contacts, contactSearchQuery);
                 return filteredContacts.length === 0 ? (
-                  <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4 text-sm text-[#A1A1AA]">
+                  <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-sm text-[#A1A1AA]">
                     {contacts.length === 0 ? 'No saved contacts yet.' : 'No contacts match your search.'}
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {filteredContacts.map((contact) => (
-                      <div key={contact.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[#27272A] bg-[#161616] p-3">
+                      <div key={contact.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-3">
                         <button
                           type="button"
                           onClick={() => {
@@ -2961,7 +2969,7 @@ function App() {
                           }}
                           className="flex min-w-0 flex-1 items-center gap-3 text-left"
                         >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[11px] font-semibold text-[#93C5FD]">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[11px] font-semibold text-[#A78BFA]">
                             {formatContactLabel(contact)
                               .split(/\s+/)
                               .filter(Boolean)
@@ -2970,7 +2978,7 @@ function App() {
                               .join('') || contact.address.slice(2, 4).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
+                            <p className="truncate text-sm font-medium text-[#F5F3FF]">{formatContactLabel(contact)}</p>
                             <p className="truncate text-xs text-[#A1A1AA]">{contact.address}</p>
                           </div>
                         </button>
@@ -2980,7 +2988,7 @@ function App() {
                             const nextContacts = removeContact(contact.address);
                             setContacts(nextContacts);
                           }}
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-[#27272A] bg-[#0a0a0a] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#0B0C11] text-[#A1A1AA] transition hover:border-red-500/50 hover:text-red-300"
                           aria-label={`Delete ${formatContactLabel(contact)}`}
                         >
                           ×
@@ -2997,7 +3005,7 @@ function App() {
 
       {showSend ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-3xl border border-[#27272A] bg-[#121212] p-6 shadow-[0_0_80px_rgba(0,0,0,0.35)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Send</h3>
               <button onClick={() => {
@@ -3019,21 +3027,21 @@ function App() {
             <div className="mt-6 space-y-4">
               {sendReview ? (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border border-[#27272A] bg-[#161616] p-4">
+                  <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                     <div className="flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Asset</span>
-                      <span className="text-[#FAFAFA]">{selectedSendAsset.symbol}</span>
+                      <span className="text-[#F5F3FF]">{selectedSendAsset.symbol}</span>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Amount</span>
-                      <span className="text-[#FAFAFA]">{sendAmount} {selectedSendAsset.symbol}</span>
+                      <span className="text-[#F5F3FF]">{sendAmount} {selectedSendAsset.symbol}</span>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Recipient</span>
-                      <span className="break-all text-right text-[#FAFAFA]">{sendTarget}</span>
+                      <span className="break-all text-right text-[#F5F3FF]">{sendTarget}</span>
                     </div>
                     {isResolvingArcName ? (
-                      <div className="mt-3 rounded-xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-sm text-[#93C5FD]">
+                      <div className="mt-3 rounded-xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3042,7 +3050,7 @@ function App() {
                   <button
                     onClick={() => void handleSend()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#8B5CF6] px-4 py-3 font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Sending…' : 'Send Now'}
                   </button>
@@ -3057,7 +3065,7 @@ function App() {
                         setSendAssetKey(e.target.value);
                         setSendAmountError('');
                       }}
-                      className="mt-2 w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3 text-sm text-[#FAFAFA] outline-none"
+                      className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
                     >
                       {sendAssets.map((asset) => (
                         <option key={asset.key} value={asset.key}>
@@ -3068,9 +3076,9 @@ function App() {
                   </label>
 
                   {scannedRequestNote ? (
-                    <div className="rounded-2xl border border-[#3B82F6]/30 bg-[#0a0a0a] p-3 text-sm text-[#93C5FD]">
+                    <div className="rounded-2xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
                       <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Requested</p>
-                      <p className="mt-2 break-words text-[#FAFAFA]">{scannedRequestNote}</p>
+                      <p className="mt-2 break-words text-[#F5F3FF]">{scannedRequestNote}</p>
                     </div>
                   ) : null}
 
@@ -3097,9 +3105,9 @@ function App() {
                                 setRecipientResolutionStatus('idle');
                                 validateSendRecipient(contact.address);
                               }}
-                              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#27272A] bg-[#161616] px-2.5 py-1.5 text-left text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-left text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
                             >
-                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[10px] font-semibold text-[#93C5FD]">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[10px] font-semibold text-[#A78BFA]">
                                 {initials}
                               </span>
                               <span className="max-w-[9rem] truncate text-xs">{formatContactLabel(contact)}</span>
@@ -3110,7 +3118,7 @@ function App() {
                     ) : null}
 
                     <div className="relative mt-2">
-                      <div className={`flex items-center gap-2 rounded-xl border bg-[#0a0a0a] px-3 py-2 ${sendRecipientError ? 'border-red-500' : 'border-[#27272A]'}`}>
+                      <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#8B5CF6]/30'}`}>
                         <input
                           value={sendAddress}
                           onChange={(e) => {
@@ -3122,13 +3130,13 @@ function App() {
                             setShowContactPicker(false);
                             validateSendRecipient(e.target.value);
                           }}
-                          className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                          className="w-full bg-transparent text-sm text-[#F5F3FF] outline-none"
                           placeholder="0x... or name.arc"
                         />
                         <button
                           type="button"
                           onClick={() => setShowContactPicker((current) => !current)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-[#27272A] bg-[#121212] text-[#A1A1AA] transition hover:border-[#3B82F6] hover:text-[#FAFAFA]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition hover:border-[#8B5CF6]/40 hover:text-[#F5F3FF]"
                           aria-label="Open contacts"
                         >
                           <Users className="h-4 w-4" />
@@ -3140,7 +3148,7 @@ function App() {
                           <button
                             type="button"
                             onClick={() => setShowContactLabelInput((current) => !current)}
-                            className="rounded-full border border-[#27272A] bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#FAFAFA] transition hover:border-[#3B82F6]"
+                            className="rounded-full border border-white/[0.06] bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
                           >
                             Save
                           </button>
@@ -3150,7 +3158,7 @@ function App() {
                             type="button"
                             onClick={() => void handleCheckArcName()}
                             disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
-                            className="rounded-full border border-[#3B82F6]/40 bg-[#121212] px-2.5 py-1 text-[11px] font-medium text-[#93C5FD] transition hover:border-[#3B82F6] disabled:cursor-not-allowed disabled:opacity-70"
+                            className="rounded-full border border-[#8B5CF6]/40 bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#A78BFA] transition hover:border-[#8B5CF6]/40 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
                           </button>
@@ -3158,9 +3166,9 @@ function App() {
                       </div>
 
                       {showContactPicker ? (
-                        <div className="mt-2 rounded-2xl border border-[#27272A] bg-[#121212] p-2 shadow-[0_0_30px_rgba(0,0,0,0.25)]">
+                        <div className="mt-2 rounded-2xl border border-white/[0.06] bg-[#111216] p-2 shadow-[0_0_30px_rgba(0,0,0,0.25)]">
                           {contacts.length === 0 ? (
-                            <div className="rounded-xl border border-[#27272A] bg-[#161616] px-3 py-3 text-xs text-[#A1A1AA]">
+                            <div className="rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-3 text-xs text-[#A1A1AA]">
                               No saved contacts yet.
                             </div>
                           ) : (
@@ -3176,9 +3184,9 @@ function App() {
                                     setShowContactPicker(false);
                                     validateSendRecipient(contact.address);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-xl border border-[#27272A] bg-[#161616] px-3 py-2 text-left transition hover:border-[#3B82F6]"
+                                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-left transition hover:border-[#8B5CF6]/40"
                                 >
-                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3B82F6]/15 text-[10px] font-semibold text-[#93C5FD]">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[10px] font-semibold text-[#A78BFA]">
                                     {formatContactLabel(contact)
                                       .split(/\s+/)
                                       .filter(Boolean)
@@ -3187,7 +3195,7 @@ function App() {
                                       .join('') || contact.address.slice(2, 4).toUpperCase()}
                                   </span>
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-xs font-medium text-[#FAFAFA]">{formatContactLabel(contact)}</p>
+                                    <p className="truncate text-xs font-medium text-[#F5F3FF]">{formatContactLabel(contact)}</p>
                                     <p className="truncate text-[11px] text-[#A1A1AA]">{contact.address}</p>
                                   </div>
                                 </button>
@@ -3203,13 +3211,13 @@ function App() {
                         <input
                           value={contactLabelDraft}
                           onChange={(e) => setContactLabelDraft(e.target.value.slice(0, 40))}
-                          className="w-full rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-2 text-sm text-[#FAFAFA] outline-none"
+                          className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2 text-sm text-[#F5F3FF] outline-none"
                           placeholder="Optional label"
                         />
                         <button
                           type="button"
                           onClick={handleSaveCurrentContact}
-                          className="rounded-xl bg-[#3B82F6] px-3 py-2 text-xs font-medium text-white"
+                          className="rounded-xl bg-[#8B5CF6] px-3 py-2 text-xs font-medium text-white"
                         >
                           Save
                         </button>
@@ -3239,8 +3247,8 @@ function App() {
                       </p>
                     ) : null}
                     {isResolvingArcName ? (
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#0a0a0a] px-3 py-1 text-[11px] text-[#93C5FD]">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#3B82F6]" />
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#A78BFA]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#8B5CF6]" />
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3248,14 +3256,14 @@ function App() {
 
                   <label className="block text-sm text-[#A1A1AA]">
                     Amount
-                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-[#27272A] bg-[#0a0a0a] px-3 py-3">
+                    <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3">
                       <input
                         value={sendAmount}
                         onChange={(e) => {
                           setSendAmount(e.target.value);
                           validateSendAmount(e.target.value);
                         }}
-                        className="w-full bg-transparent text-sm text-[#FAFAFA] outline-none"
+                        className="w-full bg-transparent text-sm text-[#F5F3FF] outline-none"
                         placeholder="0.10"
                       />
                       <button
@@ -3265,7 +3273,7 @@ function App() {
                           setSendAmountError('');
                         }}
                         disabled={txState === 'pending'}
-                        className="rounded-full border border-[#27272A] px-2 py-1 text-[11px] text-[#A1A1AA]"
+                        className="rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1 text-[11px] font-medium text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/30 hover:text-[#F5F3FF]"
                       >
                         Max
                       </button>
@@ -3280,7 +3288,7 @@ function App() {
                   <button
                     onClick={() => void handleSendReview()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#3B82F6] px-4 py-3 font-medium text-white transition hover:bg-[#2563EB] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#8B5CF6] px-4 py-3 font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Confirming…' : 'Confirm payment'}
                   </button>
@@ -3288,12 +3296,12 @@ function App() {
               )}
 
               {txState === 'confirming' && txHash ? (
-                <div className="rounded-2xl border border-[#3B82F6]/40 bg-[#3B82F6]/10 p-3 text-sm text-[#93C5FD]">
+                <div className="rounded-2xl border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 p-3 text-sm text-[#A78BFA]">
                   <div className="flex items-center gap-2">
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     <p>{txConfirmationTimedOut ? 'Still confirming — check the explorer' : 'Confirming on-chain…'}</p>
                   </div>
-                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#93C5FD]">
+                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#A78BFA]">
                     View on explorer <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
@@ -3321,35 +3329,39 @@ function App() {
         </div>
       ) : null}
 
-      {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 h-20 border-t border-[#27272A] bg-[#0A0A0A] backdrop-blur-md">
-        <div className="relative mx-auto h-full max-w-md">
-          <div className="absolute left-1/2 top-0 flex -translate-x-1/2 items-center justify-between px-4 pt-3 w-64">
-            <button
-              onClick={() => setShowContacts(true)}
-              className="h-10 w-10 rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA] flex items-center justify-center"
-              aria-label="Contacts"
-            >
-              <Users className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="h-10 w-10 rounded-full bg-[#161616] border border-[#27272A] text-[#FAFAFA] flex items-center justify-center"
-              aria-label="Settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-          </div>
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 z-10 border-t border-white/[0.06] bg-[#08090D]/95 backdrop-blur-xl">
+        <div className="relative mx-auto flex h-[72px] max-w-md items-center justify-around">
+          {/* Left: Contacts */}
+          <button
+            onClick={() => setShowContacts(true)}
+            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04]"
+            aria-label="Contacts"
+          >
+            <Users className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
+          </button>
+
+          {/* Center: Scan — primary action */}
           <button
             onClick={() => setShowScanner(true)}
             aria-label="Scan QR code"
-            className="absolute -top-8 left-1/2 flex h-16 w-16 -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-full border-4 border-[#050505] bg-[#3B82F6] text-white shadow-glow transition hover:scale-105 hover:bg-[#2563EB] active:scale-95"
+            className="group relative -mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#8B5CF6] text-white shadow-scan transition-normal hover:bg-[#7C3AED] hover:shadow-scan-hover active:scale-95"
           >
-            <ScanLine className="h-5 w-5" />
-            <span className="text-[9px] font-medium">Scan</span>
+            <ScanLine className="h-6 w-6" strokeWidth={2} />
+            {/* Subtle pulse ring on hover */}
+            <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#8B5CF6]/30 transition-normal group-hover:ring-[#8B5CF6]/50" />
+          </button>
+
+          {/* Right: Settings */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04]"
+            aria-label="Settings"
+          >
+            <Settings className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
           </button>
         </div>
-      </div>
+      </nav>
     </div>
   );
 }
