@@ -5,26 +5,29 @@ export default {
     extend: {
       colors: {
         /* Backgrounds */
-        'bg-base': '#08090D',
-        'bg-surface': '#111216',
-        'bg-elevated': '#16171C',
+        'bg-base': '#090A0F',
+        'bg-surface': '#11131A',
+        'bg-surface-raised': '#161820',
+        'bg-surface-hover': '#1B1D26',
         /* Borders */
-        'border-subtle': 'rgba(255,255,255,0.08)',
+        'border-subtle': 'rgba(255,255,255,0.07)',
         'border-strong': 'rgba(255,255,255,0.12)',
         /* Text */
-        'text-primary': '#F5F3FF',
+        'text-primary': '#F4F4F5',
         'text-secondary': '#A1A1AA',
-        'text-tertiary': '#71717A',
+        'text-muted': '#71717A',
         /* Purple accent */
         'accent': '#8B5CF6',
         'accent-hover': '#A78BFA',
         'accent-deep': '#6D28D9',
         'accent-active': '#7C3AED',
+        'accent-soft': 'rgba(139, 92, 246, 0.10)',
+        'accent-border': 'rgba(139, 92, 246, 0.25)',
         /* Legacy aliases kept for incremental migration */
-        obsidian: '#08090D',
-        surface: '#111216',
-        edge: 'rgba(255,255,255,0.08)',
-        text: '#F5F3FF',
+        obsidian: '#090A0F',
+        surface: '#11131A',
+        edge: 'rgba(255,255,255,0.07)',
+        text: '#F4F4F5',
         muted: '#A1A1AA',
         silver: '#E4E4E7',
       },
@@ -42,6 +45,10 @@ export default {
       transitionDuration: {
         'fast': '150ms',
         'normal': '200ms',
+        '180': '180ms',
+      },
+      scale: {
+        '98': '0.98',
       },
     }
   },

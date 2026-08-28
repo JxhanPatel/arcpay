@@ -4,19 +4,21 @@
 
 :root {
   /* ArcPay Design Tokens */
-  --color-bg-base: #08090D;
-  --color-bg-surface: #111216;
-  --color-bg-elevated: #16171C;
-  --color-border-subtle: rgba(255,255,255,0.08);
+  --color-bg-base: #090A0F;
+  --color-bg-surface: #11131A;
+  --color-bg-surface-raised: #161820;
+  --color-bg-surface-hover: #1B1D26;
+  --color-border-subtle: rgba(255,255,255,0.07);
   --color-border-strong: rgba(255,255,255,0.12);
-  --color-text-primary: #F5F3FF;
+  --color-text-primary: #F4F4F5;
   --color-text-secondary: #A1A1AA;
-  --color-text-tertiary: #71717A;
+  --color-text-muted: #71717A;
   --color-accent: #8B5CF6;
   --color-accent-hover: #A78BFA;
   --color-accent-deep: #6D28D9;
   --color-accent-active: #7C3AED;
   --color-accent-soft: rgba(139, 92, 246, 0.10);
+  --color-accent-border: rgba(139, 92, 246, 0.25);
   --color-accent-glow: rgba(139, 92, 246, 0.20);
 
   /* Base */
@@ -44,7 +46,7 @@ button, input { font: inherit; }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -52,8 +54,42 @@ button, input { font: inherit; }
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.10);
+  border-radius: 3px;
+}
+
+/* Enhanced modal scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.10);
   border-radius: 4px;
+  transition: background 180ms ease;
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(139,92,246,0.35);
+}
+
+/* Hide scrollbar for Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.10) transparent;
+}
+
+.custom-scrollbar:hover {
+  scrollbar-color: rgba(139,92,246,0.35) transparent;
+}
+
+/* Tabular numbers */
+.font-variant-numeric-tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Premium micro-interactions */
@@ -75,7 +111,7 @@ button, input { font: inherit; }
   }
 
   .press-effect:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .hover-lift {

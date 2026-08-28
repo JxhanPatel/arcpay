@@ -437,7 +437,7 @@ const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
   },
   error: {
     label: 'Failed',
-    className: 'border-red-700/40 bg-red-500/10 text-red-400',
+    className: 'border-red-700/40 bg-red-500/10 text-rose-500/70',
   },
   pending: {
     label: 'Pending',
@@ -684,7 +684,7 @@ const PasscodePad = ({
           ))}
         </div>
 
-        {error ? <p className="mb-4 text-center text-sm text-red-400">{error}</p> : <div className="mb-4 h-5" />}
+        {error ? <p className="mb-4 text-center text-sm text-rose-500/70">{error}</p> : <div className="mb-4 h-5" />}
 
         <div className="grid grid-cols-3 gap-3">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
@@ -2094,7 +2094,7 @@ function App() {
             </div>
           </div>
 
-          {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-rose-500/70">{error}</p> : null}
         </div>
       </div>
     );
@@ -2263,69 +2263,90 @@ function App() {
         const iconUrl = ASSET_ICON_URLS[detailAsset.symbol] ?? `https://cryptologos.cc/logos/${detailAsset.symbol.toLowerCase()}-${detailAsset.symbol.toLowerCase()}-logo.png`;
 
         return (
-          <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-            <div className="w-full max-w-2xl rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
-              <div className="flex items-center justify-between">
+          <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+            <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)]">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <img
                     src={iconUrl}
                     alt={`${detailAsset.symbol} icon`}
-                    className="h-10 w-10 rounded-full"
+                    className="h-8 w-8 rounded-full"
                     onError={(event) => {
                       event.currentTarget.style.display = 'none';
                     }}
                   />
                   <div>
-                    <h3 className="text-xl font-semibold">{detailAsset.symbol}</h3>
-                    <p className="text-xs text-[#A1A1AA]">Available: {detailAsset.balance}</p>
+                    <h3 className="text-xl font-semibold text-[#F4F4F5]">{detailAsset.symbol}</h3>
+                    <p className="text-xs text-[#A1A1AA]">Available · {detailAsset.balance}</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedAssetDetail(null)} className="text-sm text-[#A1A1AA]">Close</button>
+                <button 
+                  onClick={() => setSelectedAssetDetail(null)}
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
 
-              <div className="mt-5">
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <button
                   onClick={() => {
                     const assetKey = selectedAssetDetail;
                     setSelectedAssetDetail(null);
                     openSendModal({ presetAssetKey: assetKey });
                   }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#8B5CF6] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#7C3AED]"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#6D28D9] to-[#8B5CF6] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#7C3AED] hover:to-[#A78BFA] active:scale-98 shadow-[0_4px_12px_rgba(139,92,246,0.2)]"
                 >
                   <Send className="h-4 w-4" />
-                  Send {detailAsset.symbol}
+                  Send
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAssetDetail(null);
+                    openRequestModal();
+                  }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] border border-white/[0.08] bg-[#11131A] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:bg-[#1B1D26] hover:border-white/[0.12] active:scale-98"
+                >
+                  <Upload className="h-4 w-4" />
+                  Receive
                 </button>
               </div>
 
-              <div className="mt-5">
-                <div className="mb-3 flex items-center justify-between border-b border-white/[0.06] pb-2">
-                  <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Activity</p>
-                  <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition hover:text-[#F5F3FF]">
-                    <RefreshCcw className="h-3 w-3" />
-                    Refresh
-                  </button>
-                </div>
+              <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/[0.07]">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Activity</p>
+                <button 
+                  onClick={() => void refreshTransactionHistory()} 
+                  className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#8B5CF6]"
+                >
+                  <RefreshCcw className="h-3 w-3" />
+                  Refresh
+                </button>
+              </div>
 
-                <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                <div className="max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
                   {isHistoryLoading && transactions.length === 0 ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+                      <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06]">
-                            <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
+                            <div className="h-4 w-4 rounded-full bg-[#2B2B2B]" />
                           </div>
-                          <div className="space-y-2">
-                            <div className="h-3 w-24 rounded-full bg-white/[0.06]" />
-                            <div className="h-2.5 w-36 rounded-full bg-white/[0.06]" />
+                          <div className="flex-1">
+                            <div className="h-4 w-24 rounded bg-[#2B2B2B] mb-1"></div>
+                            <div className="h-3 w-32 rounded bg-[#1B1D26]"></div>
+                          </div>
+                          <div className="text-right">
+                            <div className="h-4 w-16 rounded bg-[#2B2B2B] mb-1"></div>
+                            <div className="h-3 w-20 rounded bg-[#1B1D26]"></div>
                           </div>
                         </div>
-                        <div className="h-3 w-16 rounded-full bg-white/[0.06]" />
                       </div>
                     ))
                   ) : null}
 
                   {!isHistoryLoading && assetTransactions.length === 0 ? (
-                    <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-6 text-center text-sm text-[#A1A1AA]">
+                    <div className="py-8 text-center text-sm text-[#A1A1AA]">
                       No {detailAsset.symbol} transactions yet.
                     </div>
                   ) : null}
@@ -2335,122 +2356,155 @@ function App() {
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const directionIcon = transaction.direction === 'received' ? (
-                      <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
                     ) : (
-                      <ArrowUpRight className="h-4 w-4 text-red-400" />
+                      <ArrowUpRight className="h-4 w-4 text-rose-500/70" />
                     );
 
                     return (
-                      <button
-                        key={transaction.hash}
-                        onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-left transition hover:border-[#8B5CF6]/40"
+                      <div 
+                        key={transaction.hash} 
+                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${
+                          transaction.status === 'error' ? 'opacity-50' : ''
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
-                            {directionIcon}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
+                              {directionIcon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                              <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
+                              <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-[#F5F3FF]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
-                            <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
-                            <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
+                          <div className="text-right pl-2">
+                            <p className={`font-semibold ${transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                              {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
+                            </p>
+                            <span className={`inline-block text-xs mt-1 ${
+                              transaction.status === 'ok' 
+                                ? 'text-emerald-500' 
+                                : transaction.status === 'error'
+                                  ? 'text-red-400'
+                                  : 'text-[#71717A]'
+                            }`}>
+                              {transaction.status === 'ok' ? '✓ Success' : statusDisplay.label}
+                            </span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <p className="text-sm font-semibold text-[#F5F3FF]">
-                            {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
-                          </p>
-                          <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
-                            {statusDisplay.label}
-                          </span>
-                        </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
-              </div>
             </div>
           </div>
         );
       })() : null}
 
       {showHistory ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-2xl rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold">Transaction History</h3>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)]">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-[#F4F4F5]">Transaction History</h3>
               <div className="flex items-center gap-2">
-                <button onClick={() => void refreshTransactionHistory()} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 text-xs text-[#F5F3FF]">
+                <button 
+                  onClick={() => void refreshTransactionHistory()} 
+                  className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#11131A] px-3 py-2 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#8B5CF6] hover:border-white/[0.12]"
+                >
                   <RefreshCcw className="h-3.5 w-3.5" />
                   Refresh
                 </button>
-                <button onClick={() => setShowHistory(false)} className="text-sm text-[#A1A1AA]">Close</button>
+                <button 
+                  onClick={() => setShowHistory(false)} 
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
             </div>
 
-            <div className="mt-5 space-y-3">
-              {isHistoryLoading ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06]">
-                        <LoaderCircle className="h-4 w-4 animate-spin text-[#A1A1AA]" />
+            <div className="mt-5">
+              <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/[0.07]">
+                <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Recent Transactions</p>
+              </div>
+                <div className="max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                  {isHistoryLoading ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
+                            <div className="h-4 w-4 rounded-full bg-[#2B2B2B]" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="h-4 w-24 rounded bg-[#2B2B2B] mb-1"></div>
+                            <div className="h-3 w-32 rounded bg-[#1B1D26]"></div>
+                          </div>
+                          <div className="text-right">
+                            <div className="h-4 w-16 rounded bg-[#2B2B2B] mb-1"></div>
+                            <div className="h-3 w-20 rounded bg-[#1B1D26]"></div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="h-3 w-24 rounded-full bg-white/[0.06]" />
-                        <div className="h-2.5 w-36 rounded-full bg-white/[0.06]" />
-                      </div>
-                    </div>
-                    <div className="h-3 w-16 rounded-full bg-white/[0.06]" />
-                  </div>
-                ))
-              ) : null}
+                    ))
+                  ) : null}
 
               {!isHistoryLoading && historyError ? (
-                <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-300">{historyError}</div>
+                <div className="py-8 text-center text-sm text-red-400">{historyError}</div>
               ) : null}
 
               {!isHistoryLoading && !historyError && transactions.length === 0 ? (
-                <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-6 text-sm text-[#A1A1AA]">No transactions yet.</div>
+                <div className="py-8 text-center text-sm text-[#A1A1AA]">No transactions yet.</div>
               ) : null}
 
               {!isHistoryLoading && !historyError && transactions.length > 0 ? (
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                <div className="max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
                   {transactions.map((transaction) => {
                     const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const directionIcon = transaction.direction === 'received' ? (
-                      <ArrowDownLeft className="h-4 w-4 text-emerald-400" />
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
                     ) : (
-                      <ArrowUpRight className="h-4 w-4 text-red-400" />
+                      <ArrowUpRight className="h-4 w-4 text-rose-500/70" />
                     );
 
                     return (
-                      <button
-                        key={transaction.hash}
-                        onClick={() => window.open(`${EXPLORER_URL}/tx/${transaction.hash}`, '_blank', 'noopener,noreferrer')}
-                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-left transition hover:border-[#8B5CF6]/40"
+                      <div 
+                        key={transaction.hash} 
+                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${
+                          transaction.status === 'error' ? 'opacity-50' : ''
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
-                            {directionIcon}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
+                              {directionIcon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
+                              <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
+                              <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-[#F5F3FF]">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
-                            <p className="text-xs text-[#A1A1AA]">{truncateAddress(counterparty)}</p>
-                            <p className="mt-1 text-[11px] text-[#A1A1AA]">{formatTimestamp(transaction.timestamp)}</p>
+                          <div className="text-right pl-2">
+                            <p className={`font-semibold ${transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                              {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
+                            </p>
+                            <span className={`inline-block text-xs mt-1 ${
+                              transaction.status === 'ok' 
+                                ? 'text-emerald-500' 
+                                : transaction.status === 'error'
+                                  ? 'text-red-400'
+                                  : 'text-[#71717A]'
+                            }`}>
+                              {transaction.status === 'ok' ? '✓ Success' : statusDisplay.label}
+                            </span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <p className="text-sm font-semibold text-[#F5F3FF]">
-                            {transaction.direction === 'received' ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
-                          </p>
-                          <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] ${statusDisplay.className}`}>
-                            {statusDisplay.label}
-                          </span>
-                        </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -2458,6 +2512,7 @@ function App() {
             </div>
           </div>
         </div>
+</div>
       ) : null}
 
       {showSettings ? (
@@ -2635,12 +2690,12 @@ function App() {
                 </button>
 
                 {addAccountError ? (
-                  <p className="mt-2 text-xs text-red-400">{addAccountError}</p>
+                  <p className="mt-2 text-xs text-rose-500/70">{addAccountError}</p>
                 ) : null}
               </div>
 
               <div className="pt-4 border-t border-white/[0.06]">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-red-400 mb-3">Danger Zone</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-rose-500/70 mb-3">Danger Zone</p>
                 {!confirmRemoval ? (
                   <button
                     onClick={() => setConfirmRemoval(true)}
@@ -2779,7 +2834,7 @@ function App() {
                   <span>Precision: {selectedRequestAssetDecimals}</span>
                   <span>Default: {selectedRequestAsset.symbol}</span>
                 </div>
-                {requestAmountError ? <p className="mt-2 text-xs text-red-400">{requestAmountError}</p> : null}
+                {requestAmountError ? <p className="mt-2 text-xs text-rose-500/70">{requestAmountError}</p> : null}
               </label>
 
               <label className="block text-sm text-[#A1A1AA]">
@@ -2815,7 +2870,7 @@ function App() {
                       }}
                       className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]"
                     >
-                      {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                      {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-emerald-500/70" /> : <Copy className="h-4 w-4" />}
                       {requestLinkCopied ? 'Copied' : 'Copy request link'}
                     </button>
                   </div>
@@ -2930,7 +2985,7 @@ function App() {
                       ) : null}
                     </div>
 
-                    {addContactError ? <p className="text-xs text-red-400">{addContactError}</p> : null}
+                    {addContactError ? <p className="text-xs text-rose-500/70">{addContactError}</p> : null}
                   </div>
                 </div>
               )}
@@ -3142,7 +3197,7 @@ function App() {
                           <Users className="h-4 w-4" />
                         </button>
                         {recipientResolutionStatus === 'resolved' ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500/70" />
                         ) : null}
                         {recipientResolutionStatus === 'idle' && getContactTargetAddress() ? (
                           <button
@@ -3234,9 +3289,9 @@ function App() {
                       </div>
                     ) : null}
 
-                    {sendRecipientError ? <p className="mt-2 text-xs text-red-400">{sendRecipientError}</p> : null}
+                    {sendRecipientError ? <p className="mt-2 text-xs text-rose-500/70">{sendRecipientError}</p> : null}
                     {recipientResolutionStatus === 'resolved' && resolvedSendAddress ? (
-                      <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-400">
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-500/70">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Resolved to {resolvedSendAddress.slice(0, 6)}...{resolvedSendAddress.slice(-4)}
                       </p>
@@ -3282,7 +3337,7 @@ function App() {
                       <span>Available: {formatDisplayBalance(selectedSendAsset.balance)} {selectedSendAsset.symbol}</span>
                       <span>Decimals: {selectedSendAssetDecimals}</span>
                     </div>
-                    {sendAmountError ? <p className="mt-2 text-xs text-red-400">{sendAmountError}</p> : null}
+                    {sendAmountError ? <p className="mt-2 text-xs text-rose-500/70">{sendAmountError}</p> : null}
                   </label>
 
                   <button
