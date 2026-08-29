@@ -292,9 +292,13 @@ describe('getAssetUsdPrice', () => {
     expect(getAssetUsdPrice('CIRBTC')).toBe(65000);
   });
 
-  it('returns 1 for stable USD-pegged assets', () => {
+  it('returns 1 for USDC (USD-pegged stablecoin)', () => {
     expect(getAssetUsdPrice('USDC')).toBe(1);
-    expect(getAssetUsdPrice('EURC')).toBe(1);
+  });
+
+  it('returns EUR/USD rate for EURC (euro-pegged stablecoin)', () => {
+    // Should return the mock EUR/USD rate, not 1
+    expect(getAssetUsdPrice('EURC')).toBe(1.08);
   });
 
   it('returns null for unknown or unpriced symbols', () => {
@@ -312,8 +316,13 @@ describe('getAssetUsdValue', () => {
     expect(getAssetUsdValue('ARC', '10')).toBeNull();
   });
 
-  it('returns balance unchanged (price=1) for stable assets', () => {
+  it('returns balance unchanged (price=1) for USDC', () => {
     expect(getAssetUsdValue('USDC', '38.894348')).toBe(38.894348);
+  });
+
+  it('returns balance * EUR/USD rate for EURC', () => {
+    // 34 EURC * 1.08 EUR/USD rate = 36.72 USD
+    expect(getAssetUsdValue('EURC', '34.00')).toBe(36.72);
   });
 
   it('returns null for non-numeric balances without NaN leakage', () => {
@@ -337,17 +346,18 @@ describe('portfolio value calculation with mixed assets (new pricing)', () => {
     }, 0);
 
     // USDC: 38.894348 * 1 = 38.894348
-    // EURC: 39.000000 * 1 = 39.000000
+    // EURC: 39.000000 * 1.08 = 42.12
     // cirBTC: 0.0002 * 65000 = 13
     // ARC: null -> 0
-    // Total: 38.894348 + 39.000000 + 13 = 90.894348
-    const stableUSDCEURCsum = 38.894348 + 39.0;
+    // Total: 38.894348 + 42.12 + 13 = 94.014348
+    const usdcValue = 38.894348 * 1;
+    const eurcValue = 39.000000 * 1.08;
     const cirBTCEstimate = 0.0002 * 65000;
-    expect(portfolioValue).toBeCloseTo(stableUSDCEURCsum + cirBTCEstimate, 6);
+    expect(portfolioValue).toBeCloseTo(usdcValue + eurcValue + cirBTCEstimate, 6);
 
     // Formatted for display
     const formattedPortfolioValue = formatDisplayBalance(portfolioValue);
-    expect(formattedPortfolioValue).toBe('90.89');
+    expect(formattedPortfolioValue).toBe('94.01');
 
     // ARC must not break or poison the sum
     expect(Number.isFinite(portfolioValue)).toBe(true);

@@ -68,8 +68,19 @@ const MOCK_NON_STABLE_USD_PRICES: Record<string, number> = {
   CIRBTC: 65000,
 };
 
+// Mock EUR/USD exchange rate for EURC stablecoin pricing.
+// EURC is euro-pegged (1 EURC ≈ 1 EUR), so we need to convert EUR to USD.
+// Current approximate EUR/USD rate - replace with real price oracle later.
+const EURC_USD_RATE = 1.08;
+
 export const getAssetUsdPrice = (symbol: string): number | null => {
   const normalized = String(symbol ?? '').toUpperCase();
+  if (normalized === 'USDC') {
+    return 1;
+  }
+  if (normalized === 'EURC') {
+    return EURC_USD_RATE;
+  }
   if (isStableUsdPegged(normalized)) {
     return 1;
   }
