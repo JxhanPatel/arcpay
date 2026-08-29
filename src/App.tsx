@@ -2207,9 +2207,7 @@ function App() {
           {visibleAssets.length > 0 ? (
             <div className="divide-y divide-white/[0.04]">
               {visibleAssets.map((asset) => {
-                const usdEstimate = !isStableUsdPegged(asset.symbol)
-                  ? getAssetUsdValue(asset.symbol, asset.balance)
-                  : null;
+                const usdEstimate = getAssetUsdValue(asset.symbol, asset.balance);
                 return (
                 <button
                   key={asset.key}
@@ -2234,14 +2232,11 @@ function App() {
                       <p className="text-[14px] font-semibold text-[#F5F3FF]">{asset.symbol}</p>
                       <div className="mt-0.5 flex items-center gap-1.5">
                         <span className="text-[12px] text-[#71717A]">{asset.balance} available</span>
-                        {usdEstimate !== null && (
-                          <span className="text-[11px] text-[#71717A]">· ≈${formatDisplayBalance(usdEstimate)}</span>
-                        )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <p className="font-mono text-[13px] font-semibold text-[#F5F3FF]">{asset.balance}</p>
+                    <p className="font-mono text-[13px] font-semibold text-[#F5F3FF]">${formatDisplayBalance(usdEstimate ?? 0)}</p>
                     <ChevronRight className="h-4 w-4 text-[#71717A] transition-fast group-hover:text-[#A78BFA]" />
                   </div>
                 </button>
