@@ -41,6 +41,7 @@ import {
   parseTokenBalances,
   parseTransactionDirection,
 } from './balance';
+import { buildFeeSummary, formatGasFeeUsdc } from './gasEstimate';
 import {
   type Contact,
   formatContactLabel,
@@ -752,6 +753,9 @@ function App() {
   const [sendAmount, setSendAmount] = useState('');
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
   const [sendReview, setSendReview] = useState(false);
+  const [gasFeeEstimate, setGasFeeEstimate] = useState<string | null>(null);
+  const [isEstimatingGasFee, setIsEstimatingGasFee] = useState(false);
+  const [gasFeeEstimateError, setGasFeeEstimateError] = useState<string | null>(null);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<string | null>(null);
   const [sendRecipientError, setSendRecipientError] = useState('');
   const [recipientResolutionStatus, setRecipientResolutionStatus] = useState<'idle' | 'checking' | 'resolved' | 'unsupported'>('idle');
@@ -1297,6 +1301,9 @@ function App() {
     setSendAmount(scanDetails?.amount ?? '');
     setScannedRequestNote(scanDetails?.note ?? '');
     setSendReview(false);
+    setGasFeeEstimate(null);
+    setIsEstimatingGasFee(false);
+    setGasFeeEstimateError(null);
     setSendRecipientError('');
     setSendAmountError('');
     setResolvedSendAddress(null);
@@ -1773,6 +1780,51 @@ function App() {
     setSendReview(true);
     setTxState('idle');
     setError(null);
+
+    // Kick off gas estimation asynchronously — do not block the review screen.
+    estimateSendGasFee();
+  };
+
+  const estimateSendGasFee = async () => {
+    if (!wallet) return;
+
+    setGasFeeEstimate(null);
+    setGasFeeEstimateError(null);
+    setIsEstimatingGasFee(true);
+
+    try {
+      const resolvedRecipient = resolvedSendAddress ?? sendTarget;
+      const plan = buildSendTransactionPlan(selectedSendAsset, resolvedRecipient, sendAmount);
+
+      let gasLimit: bigint;
+      if (plan.kind === 'native') {
+        gasLimit = await provider.estimateGas({
+          from: wallet.address,
+          to: plan.tx.to,
+          value: plan.tx.value,
+        });
+      } else {
+        const tokenContract = new ethers.Contract(plan.tokenAddress, plan.abi, wallet);
+        gasLimit = await tokenContract.transfer.estimateGas(...plan.args);
+      }
+
+      const feeData = await provider.getFeeData();
+      const gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas;
+
+      if (gasPrice === null || gasPrice === undefined) {
+        setGasFeeEstimateError('Unable to retrieve gas price from the network.');
+        return;
+      }
+
+      const formattedFee = formatGasFeeUsdc(gasLimit, gasPrice);
+      setGasFeeEstimate(formattedFee);
+    } catch (err) {
+      setGasFeeEstimateError(
+        err instanceof Error ? err.message : 'Gas estimation failed.',
+      );
+    } finally {
+      setIsEstimatingGasFee(false);
+    }
   };
 
   // Restores the exact pre-send balances captured before the optimistic
@@ -1849,6 +1901,9 @@ function App() {
       // Move to 'confirming' state immediately so UI shows hash + spinner
       setTxState('confirming');
       setSendReview(false);
+      setGasFeeEstimate(null);
+      setIsEstimatingGasFee(false);
+      setGasFeeEstimateError(null);
 
       // Save contact in background
       setContacts((current) => {
@@ -3064,6 +3119,9 @@ function App() {
                 setShowContactLabelInput(false);
                 setContactLabelDraft('');
                 setSendReview(false);
+                setGasFeeEstimate(null);
+                setIsEstimatingGasFee(false);
+                setGasFeeEstimateError(null);
                 setSendAmount('');
                 setSendAddress('');
                 setSendAmountError('');
@@ -3084,12 +3142,56 @@ function App() {
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Amount</span>
-                      <span className="text-[#F5F3FF]">{sendAmount} {selectedSendAsset.symbol}</span>
+                      <div className="text-right">
+                        <span className="text-[#F5F3FF]">{sendAmount} {selectedSendAsset.symbol}</span>
+                        {(() => {
+                          const usdValue = getAssetUsdValue(selectedSendAsset.symbol, sendAmount);
+                          return usdValue !== null ? (
+                            <span className="ml-2 text-xs text-[#71717A]">≈ ${formatDisplayBalance(usdValue)}</span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Recipient</span>
                       <span className="break-all text-right text-[#F5F3FF]">{sendTarget}</span>
                     </div>
+                    <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
+                      <span>Network Fee</span>
+                      {isEstimatingGasFee ? (
+                        <span className="flex items-center gap-1.5 text-xs text-[#71717A]">
+                          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          Estimating…
+                        </span>
+                      ) : gasFeeEstimate !== null ? (
+                        <div className="text-right">
+                          <span className="text-[#F5F3FF]">{gasFeeEstimate} USDC</span>
+                          {(() => {
+                            const feeUsd = getAssetUsdValue('USDC', gasFeeEstimate);
+                            return feeUsd !== null ? (
+                              <span className="ml-2 text-xs text-[#71717A]">≈ ${formatDisplayBalance(feeUsd)}</span>
+                            ) : null;
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-[#71717A]">
+                          {gasFeeEstimateError ?? 'Fee unavailable — you can still send'}
+                        </span>
+                      )}
+                    </div>
+                    {(() => {
+                      const feeSummary = buildFeeSummary({
+                        sentAmount: sendAmount,
+                        sentSymbol: selectedSendAsset.symbol,
+                        estimatedFeeUsdc: gasFeeEstimate,
+                      });
+                      return feeSummary.showTotal && feeSummary.total !== null ? (
+                        <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm">
+                          <span className="font-medium text-[#F5F3FF]">Total</span>
+                          <span className="font-medium text-[#F5F3FF]">{feeSummary.total} USDC</span>
+                        </div>
+                      ) : null;
+                    })()}
                     {isResolvingArcName ? (
                       <div className="mt-3 rounded-xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
                         Resolving ArcName handle…
