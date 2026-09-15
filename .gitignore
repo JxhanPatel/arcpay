@@ -36,3 +36,4 @@ coverage/
 *.temp
 config.yaml
 litellm.log
+.ai/

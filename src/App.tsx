@@ -647,7 +647,14 @@ const PasscodePad = ({
   const submitLabel = mode === 'unlock' ? 'Unlock' : 'Continue';
 
   const handleDigit = (digit: string) => {
-    setPin((current) => (current.length >= 12 ? current : current + digit));
+    setPin((current) => {
+      if (current.length >= 4) return current;
+      const nextPin = current + digit;
+      if (nextPin.length === 4) {
+        onComplete(nextPin);
+      }
+      return nextPin;
+    });
   };
 
   const handleBackspace = () => {
@@ -675,7 +682,7 @@ const PasscodePad = ({
           aria-label="PIN entry"
           role="textbox"
         >
-          {Array.from({ length: 6 }).map((_, index) => (
+          {Array.from({ length: 4 }).map((_, index) => (
             <span
               key={index}
               className={`h-3 w-3 rounded-full border transition-fast ${
@@ -716,7 +723,7 @@ const PasscodePad = ({
           <button
             type="button"
             onClick={() => onComplete(pin)}
-            disabled={pin.length < 6}
+            disabled={pin.length < 4}
             className="press-effect rounded-[14px] bg-[#8B5CF6] py-3 text-sm font-medium text-white transition-normal hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}

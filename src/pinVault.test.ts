@@ -8,8 +8,8 @@ import {
 } from './utils/pinVault';
 
 // Deterministic test inputs — no network, no RPC, no shared state.
-const PIN = '123456';
-const WRONG_PIN = '987654';
+const PIN = '1234';
+const WRONG_PIN = '9876';
 const PRIVATE_KEY =
   '0x1111111111111111111111111111111111111111111111111111111111111111';
 
