@@ -1674,6 +1674,15 @@ function App() {
       return false;
     }
 
+    // Enforce maximum 2 decimal places
+    // This regex matches numbers with up to 2 decimal places
+    // It allows: 0, 1, 1.0, 1.00, 1.1, 1.12, etc.
+    // It rejects: 1.001, 1.123, etc.
+    if (!/^\d+(\.\d{0,2})?$/.test(normalized)) {
+      setSendAmountError('Amount cannot exceed 2 decimal places.');
+      return false;
+    }
+
     const availableBalance = Number.parseFloat(selectedSendAsset.balance);
     if (Number.isFinite(availableBalance) && numericAmount > availableBalance) {
       setSendAmountError(`Amount exceeds available ${selectedSendAsset.symbol} balance.`);
@@ -3218,20 +3227,33 @@ function App() {
                 <>
                   <label className="block text-sm text-[#A1A1AA]">
                     Asset
-                    <select
-                      value={sendAssetKey}
-                      onChange={(e) => {
-                        setSendAssetKey(e.target.value);
-                        setSendAmountError('');
-                      }}
-                      className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
-                    >
-                      {sendAssets.map((asset) => (
-                        <option key={asset.key} value={asset.key}>
-                          {asset.symbol}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="group relative mt-2">
+                      <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 transition-all duration-200 hover:border-[#8B5CF6]/30 hover:bg-[#16171C]">
+                        <div className="relative">
+                          <img
+                            src={ASSET_ICON_URLS[selectedSendAsset.symbol] ?? `https://cryptologos.cc/logos/${selectedSendAsset.symbol.toLowerCase()}-${selectedSendAsset.symbol.toLowerCase()}-logo.png`}
+                            alt={`${selectedSendAsset.symbol} icon`}
+                            className="h-8 w-8 shrink-0 rounded-full shadow-sm"
+                          />
+                          <div className="absolute -inset-1 rounded-full bg-[#8B5CF6]/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100"></div>
+                        </div>
+                        <select
+                          value={sendAssetKey}
+                          onChange={(e) => {
+                            setSendAssetKey(e.target.value);
+                            setSendAmountError('');
+                          }}
+                          className="w-full appearance-none bg-transparent text-sm font-medium text-[#F5F3FF] outline-none cursor-pointer"
+                        >
+                          {sendAssets.map((asset) => (
+                            <option key={asset.key} value={asset.key} className="bg-[#0B0C11] text-[#F5F3FF]">
+                              {asset.symbol}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronRight className="h-4 w-4 text-[#8B5CF6] opacity-70 transition-transform duration-200 group-hover:translate-x-1" />
+                      </div>
+                    </div>
                   </label>
 
                   {scannedRequestNote ? (
@@ -3242,40 +3264,7 @@ function App() {
                   ) : null}
 
                   <label className="block text-sm text-[#A1A1AA]">
-                    <span className="mb-2 block">Recipient address or ArcName</span>
-
-                    {contacts.length > 0 ? (
-                      <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-                        {contacts.map((contact) => {
-                          const initials = formatContactLabel(contact)
-                            .split(/\s+/)
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((part) => part[0]?.toUpperCase() ?? '')
-                            .join('') || contact.address.slice(2, 4).toUpperCase();
-
-                          return (
-                            <button
-                              key={contact.id}
-                              type="button"
-                              onClick={() => {
-                                setSendAddress(contact.address);
-                                setResolvedSendAddress(contact.address);
-                                setRecipientResolutionStatus('idle');
-                                validateSendRecipient(contact.address);
-                              }}
-                              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-left text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
-                            >
-                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[10px] font-semibold text-[#A78BFA]">
-                                {initials}
-                              </span>
-                              <span className="max-w-[9rem] truncate text-xs">{formatContactLabel(contact)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-
+                    <span className="mb-2 block">Recipient</span>
                     <div className="relative mt-2">
                       <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#8B5CF6]/30'}`}>
                         <input
@@ -3428,7 +3417,7 @@ function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSendAmount(selectedSendAsset.balance);
+                          setSendAmount(parseFloat(selectedSendAsset.balance).toFixed(2));
                           setSendAmountError('');
                         }}
                         disabled={txState === 'pending'}
@@ -3439,7 +3428,23 @@ function App() {
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs text-[#A1A1AA]">
                       <span>Available: {formatDisplayBalance(selectedSendAsset.balance)} {selectedSendAsset.symbol}</span>
-                      <span>Decimals: {selectedSendAssetDecimals}</span>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      {[25, 50, 75, 100].map((percent) => (
+                        <button
+                          key={percent}
+                          type="button"
+                          onClick={() => {
+                            const balance = parseFloat(selectedSendAsset.balance);
+                            setSendAmount((balance * (percent / 100)).toFixed(2));
+                            setSendAmountError('');
+                          }}
+                          disabled={txState === 'pending'}
+                          className="flex-1 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-xs font-medium text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/30 hover:text-[#F5F3FF]"
+                        >
+                          {percent}%
+                        </button>
+                      ))}
                     </div>
                     {sendAmountError ? <p className="mt-2 text-xs text-rose-500/70">{sendAmountError}</p> : null}
                   </label>
