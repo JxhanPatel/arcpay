@@ -92,12 +92,12 @@ import {
   type AccountMeta,
 } from './accounts';
 
-const ARC_RPC_URL = 'https://5042002.rpc.thirdweb.com';
+const ARC_RPC_URL = 'https://rpc.testnet.arc.network';
 const ARC_CHAIN_ID = 5042002;
 const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';
-const EXPLORER_URL = 'https://testnet.arcscan.app';
-const ARC_EXPLORER_API_URL = 'https://testnet.arcscan.app/api/v2';
+const EXPLORER_URL = 'https://explorer.testnet.arc.io';
+const ARC_EXPLORER_API_URL = 'https://explorer.testnet.arc.io/api/v2';
 const NATIVE_VALUE_DECIMALS = 18;
 export const ERC20_TRANSFER_ABI = ['function transfer(address to, uint256 amount) returns (bool)'];
 const ASSET_ICON_URLS: Record<string, string> = {
