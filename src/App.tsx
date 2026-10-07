@@ -736,6 +736,127 @@ const PasscodePad = ({
 
 type AppScreenState = 'setup' | 'unlock' | 'create-passcode' | 'confirm-passcode' | 'dashboard';
 
+type AssetOption = {
+  key: string;
+  symbol: string;
+  balance: string;
+  decimals: number;
+};
+
+type AssetSelectorProps = {
+  id: string;
+  label: string;
+  assets: AssetOption[];
+  value: string;
+  onChange: (key: string) => void;
+};
+
+// AssetSelector — accessible, custom-styled dropdown that shows the selected
+// asset icon + symbol + balance and lists all options with zero-balance dimming.
+const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProps) => {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selected = assets.find((asset) => asset.key === value) ?? assets[0] ?? null;
+  const listId = `${id}-listbox`;
+  const optionId = (key: string) => `${id}-opt-${key}`;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const iconUrl = (symbol: string) =>
+    ASSET_ICON_URLS[symbol] ?? `https://cryptologos.cc/logos/${symbol.toLowerCase()}-${symbol.toLowerCase()}-logo.png`;
+
+  const isZero = (asset: AssetOption) => {
+    const n = Number(asset.balance);
+    return !Number.isFinite(n) || n <= 0;
+  };
+
+  return (
+    <div ref={containerRef} className="relative" role="combobox" aria-expanded={open} aria-haspopup="listbox" aria-controls={open ? listId : undefined}>
+      <label htmlFor={`${id}-trigger`} className="block text-sm text-[#A1A1AA] mb-1.5">
+        {label}
+      </label>
+      <button
+        id={`${id}-trigger`}
+        type="button"
+        aria-expanded={open}
+        aria-label={`${label}: ${selected?.symbol ?? 'None'}`}
+        onClick={() => setOpen((prev) => !prev)}
+        className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 text-left transition-all duration-200 hover:border-[#8B5CF6]/30 hover:bg-[#16171C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+      >
+        {selected ? (
+          <>
+            <img
+              src={iconUrl(selected.symbol)}
+              alt=""
+              className="h-8 w-8 shrink-0 rounded-full shadow-sm"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+            <div className="min-w-0 flex-1 text-left">
+              <span className="block text-sm font-medium text-[#F5F3FF] truncate">{selected.symbol}</span>
+              <span className={`block text-[11px] font-variant-numeric-tabular ${isZero(selected) ? 'text-[#555]' : 'text-[#71717A]'}`}>
+                {formatDisplayBalance(selected.balance)} available
+              </span>
+            </div>
+          </>
+        ) : (
+          <span className="text-sm text-[#71717A]">Select asset…</span>
+        )}
+        <ChevronRight className={`h-4 w-4 text-[#8B5CF6] opacity-70 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label={`${label} options`}
+          className="absolute z-50 mt-1 w-full max-h-72 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overflow-hidden overscroll-contain"
+        >
+          {assets.map((asset) => {
+            const zero = isZero(asset);
+            const active = asset.key === value;
+            return (
+              <button
+                key={asset.key}
+                id={optionId(asset.key)}
+                type="button"
+                role="option"
+                aria-selected={active}
+                aria-label={`${asset.symbol}, ${formatDisplayBalance(asset.balance)}`}
+                onClick={() => { onChange(asset.key); setOpen(false); }}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
+                  active ? 'bg-[#8B5CF6]/10' : 'hover:bg-white/[0.04]'
+                } ${zero ? 'opacity-60' : ''}`}
+              >
+                <img
+                  src={iconUrl(asset.symbol)}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded-full shadow-sm"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className={`block text-sm font-medium truncate ${zero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
+                    {asset.symbol}
+                  </span>
+                  <span className={`block text-[11px] font-variant-numeric-tabular ${zero ? 'text-[#555]' : 'text-[#71717A]'}`}>
+                    {formatDisplayBalance(asset.balance)} available
+                  </span>
+                </div>
+                {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#8B5CF6]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [privateKey, setPrivateKey] = useState<string | null>(null);
   const [wallet, setWallet] = useState<ArcWallet | null>(null);
@@ -761,6 +882,16 @@ function App() {
   const [sendAssetKey, setSendAssetKey] = useState('usdc');
   const [sendReview, setSendReview] = useState(false);
   const [gasFeeEstimate, setGasFeeEstimate] = useState<string | null>(null);
+
+  // Format amount for input with asset-specific decimal precision
+  const formatAmountForInput = (amount: number | string, decimals: number) => {
+    const numericValue = Number.parseFloat(String(amount));
+    if (!Number.isFinite(numericValue) || numericValue < 0) {
+      return '';
+    }
+    const maxDecimals = Number.isFinite(decimals) && decimals >= 0 ? decimals : 2;
+    return numericValue.toFixed(maxDecimals).replace(/0+$/, '').replace(/\.$/, '');
+  };
   const [isEstimatingGasFee, setIsEstimatingGasFee] = useState(false);
   const [gasFeeEstimateError, setGasFeeEstimateError] = useState<string | null>(null);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<string | null>(null);
@@ -1474,7 +1605,13 @@ function App() {
   };
 
   const sendAssets = useMemo(() => {
-    return filterNonZeroAssetBalances(tokenAssets.length > 0 ? tokenAssets : assetBalances);
+    // Always include native USDC (the gas asset) so the selector is never empty
+    // and users can always select USDC even when holding other tokens.
+    const nativeUsdc = assetBalances.find((asset) => asset.symbol === 'USDC');
+    const merged = nativeUsdc
+      ? [nativeUsdc, ...tokenAssets.filter((t) => t.symbol !== 'USDC')]
+      : tokenAssets;
+    return filterNonZeroAssetBalances(merged);
   }, [assetBalances, tokenAssets]);
 
   const selectedSendAsset = useMemo(() => {
@@ -1674,12 +1811,10 @@ function App() {
       return false;
     }
 
-    // Enforce maximum 2 decimal places
-    // This regex matches numbers with up to 2 decimal places
-    // It allows: 0, 1, 1.0, 1.00, 1.1, 1.12, etc.
-    // It rejects: 1.001, 1.123, etc.
-    if (!/^\d+(\.\d{0,2})?$/.test(normalized)) {
-      setSendAmountError('Amount cannot exceed 2 decimal places.');
+    const assetDecimals = selectedSendAsset.decimals ?? getAssetDecimals(selectedSendAsset.symbol);
+    const maxDecimals = Number.isFinite(assetDecimals) && assetDecimals > 0 ? assetDecimals : 2;
+    if (!new RegExp(`^\\d+(\\.\\d{0,${maxDecimals}})?$`).test(normalized)) {
+      setSendAmountError(`Amount cannot exceed ${maxDecimals} decimal places.`);
       return false;
     }
 
@@ -2330,7 +2465,7 @@ function App() {
 
         return (
           <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-            <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)]">
+            <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)] flex flex-col h-full">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <img
@@ -2390,9 +2525,9 @@ function App() {
                 </button>
               </div>
 
-                <div className="max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="pr-1 custom-scrollbar scrollbar-hide overflow-y-auto">
                   {isHistoryLoading && transactions.length === 0 ? (
-                    Array.from({ length: 3 }).map((_, index) => (
+                    Array.from({ length: 4 }).map((_, index) => (
                       <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
@@ -2471,7 +2606,7 @@ function App() {
 
       {showHistory ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)]">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)] flex flex-col h-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-[#F4F4F5]">Transaction History</h3>
               <div className="flex items-center gap-2">
@@ -2492,11 +2627,11 @@ function App() {
               </div>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-5 flex-1 flex flex-col overflow-y-auto">
               <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/[0.07]">
                 <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Recent Transactions</p>
               </div>
-                <div className="max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="pr-1 custom-scrollbar scrollbar-hide overflow-y-auto">
                   {isHistoryLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
@@ -2526,7 +2661,7 @@ function App() {
               ) : null}
 
               {!isHistoryLoading && !historyError && transactions.length > 0 ? (
-                <div className="max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+                <div className="pr-1 custom-scrollbar scrollbar-hide overflow-y-auto">
                   {transactions.map((transaction) => {
                     const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
                     const tokenDisplay = formatDisplayBalance(transaction.value);
@@ -2991,18 +3126,7 @@ function App() {
           <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Contacts</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsAddContactOpen(!isAddContactOpen)}
-                  className={`rounded-full border border-white/[0.06] bg-[#16171C] p-2 text-[#A1A1AA] transition hover:text-[#F5F3FF] ${
-                    isAddContactOpen ? 'border-[#8B5CF6] bg-[#8B5CF6]/10' : ''
-                  }`}
-                  aria-label={isAddContactOpen ? 'Close add contact form' : 'Add contact'}
-                >
-                  {isAddContactOpen ? <X size={18} /> : <Plus size={18} />}
-                </button>
-                <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
-              </div>
+              <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
 
             <div className="mt-5 space-y-4">
@@ -3067,6 +3191,20 @@ function App() {
                   className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] pl-10 pr-4 py-2.5 text-sm text-[#F5F3FF] outline-none"
                 />
               </div>
+
+              {/* Add contact button */}
+              <button
+                onClick={() => setIsAddContactOpen(!isAddContactOpen)}
+                className={`w-full flex items-center justify-center gap-2 rounded-xl border ${
+                  isAddContactOpen
+                    ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#A78BFA]'
+                    : 'border-white/[0.06] bg-[#16171C] text-[#F5F3FF] hover:text-[#F5F3FF]'
+                } py-2.5 text-sm font-medium transition`}
+                aria-label="Add contact"
+              >
+                {isAddContactOpen ? <X size={18} /> : <Plus size={18} />}
+                Add Contact
+              </button>
 
               {/* Filtered contacts list */}
               {(() => {
@@ -3225,36 +3363,13 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <label className="block text-sm text-[#A1A1AA]">
-                    Asset
-                    <div className="group relative mt-2">
-                      <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 transition-all duration-200 hover:border-[#8B5CF6]/30 hover:bg-[#16171C]">
-                        <div className="relative">
-                          <img
-                            src={ASSET_ICON_URLS[selectedSendAsset.symbol] ?? `https://cryptologos.cc/logos/${selectedSendAsset.symbol.toLowerCase()}-${selectedSendAsset.symbol.toLowerCase()}-logo.png`}
-                            alt={`${selectedSendAsset.symbol} icon`}
-                            className="h-8 w-8 shrink-0 rounded-full shadow-sm"
-                          />
-                          <div className="absolute -inset-1 rounded-full bg-[#8B5CF6]/20 opacity-0 transition-opacity duration-200 group-hover:opacity-100"></div>
-                        </div>
-                        <select
-                          value={sendAssetKey}
-                          onChange={(e) => {
-                            setSendAssetKey(e.target.value);
-                            setSendAmountError('');
-                          }}
-                          className="w-full appearance-none bg-transparent text-sm font-medium text-[#F5F3FF] outline-none cursor-pointer"
-                        >
-                          {sendAssets.map((asset) => (
-                            <option key={asset.key} value={asset.key} className="bg-[#0B0C11] text-[#F5F3FF]">
-                              {asset.symbol}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronRight className="h-4 w-4 text-[#8B5CF6] opacity-70 transition-transform duration-200 group-hover:translate-x-1" />
-                      </div>
-                    </div>
-                  </label>
+                  <AssetSelector
+                    id="send-asset"
+                    label="Asset"
+                    assets={sendAssets}
+                    value={sendAssetKey}
+                    onChange={(key) => { setSendAssetKey(key); setSendAmountError(''); }}
+                  />
 
                   {scannedRequestNote ? (
                     <div className="rounded-2xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
@@ -3417,7 +3532,7 @@ function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          setSendAmount(parseFloat(selectedSendAsset.balance).toFixed(2));
+                          setSendAmount(selectedSendAsset.balance);
                           setSendAmountError('');
                         }}
                         disabled={txState === 'pending'}
@@ -3436,7 +3551,7 @@ function App() {
                           type="button"
                           onClick={() => {
                             const balance = parseFloat(selectedSendAsset.balance);
-                            setSendAmount((balance * (percent / 100)).toFixed(2));
+                            setSendAmount(formatAmountForInput(balance * (percent / 100), selectedSendAsset.decimals ?? getAssetDecimals(selectedSendAsset.symbol)));
                             setSendAmountError('');
                           }}
                           disabled={txState === 'pending'}

@@ -76,19 +76,48 @@
   }
   
   /* Existing utility classes - rethemed */
+  /* Minimal hidden scrollbar for clean, minimal scroll areas */
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+    width: 0;
+    height: 0;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar-track {
+    display: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar-thumb {
+    display: none;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(var(--ink), 0.15);
-    border-radius: 4px;
+    background: rgba(var(--ink), 0.1);
+    border-radius: 2px;
+    transition: background 0.2s ease;
   }
-  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-    background: rgba(var(--ink), 0.25);
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--ink), 0.2);
   }
+  
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(var(--ink), 0.15) transparent;
+    scrollbar-color: rgba(var(--ink), 0.1) transparent;
   }
+  
   .custom-scrollbar:hover {
-    scrollbar-color: rgba(var(--ink), 0.25) transparent;
+    scrollbar-color: rgba(var(--ink), 0.15) transparent;
   }
   
   .font-variant-numeric-tabular {

@@ -231,6 +231,15 @@ export const formatDisplayBalance = (balance: string | number) => {
   }).format(numericValue);
 };
 
+export const formatAmountForInput = (amount: number | string, decimals: number) => {
+  const numericValue = Number.parseFloat(String(amount));
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return '';
+  }
+  const maxDecimals = Number.isFinite(decimals) && decimals >= 0 ? decimals : 2;
+  return numericValue.toFixed(maxDecimals).replace(/0+$/, '').replace(/\.$/, '');
+};
+
 export const buildRequestLink = (id: string, amount: string, note = '') => {
   const normalizedId = id.trim();
   const normalizedAmount = amount.trim();

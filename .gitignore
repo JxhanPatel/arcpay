@@ -3,13 +3,16 @@ node_modules/
 
 # Build output
 /dist/
+/dist-ssr/
+*.js.map
+*.css.map
+
+# Vite / TypeScript
 /.vite/
 .cache/
 .parcel-cache/
 .nyc_output/
 *.tsbuildinfo
-/vite.config.js
-/vite.config.d.ts
 
 # Environment files
 .env
@@ -27,6 +30,9 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
 
 # Test coverage
 coverage/
@@ -34,6 +40,6 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
-config.yaml
 litellm.log
-.ai/
+.agents/
+skills-lock.json
