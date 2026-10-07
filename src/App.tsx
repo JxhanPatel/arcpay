@@ -26,6 +26,10 @@ import {
   X,
 } from 'lucide-react';
 import logoUrl from './assets/logo.png';
+import logoForQrUrl from './assets/logo-for-qr.png';
+import usdcSvg from './assets/usdc.svg';
+import eurcSvg from './assets/eurc.svg';
+import cirbtcSvg from './assets/cirbtc.svg';
 import { QRCodeSVG } from 'qrcode.react';
 import { BrowserQRCodeReader } from '@zxing/browser';
 import {
@@ -101,10 +105,10 @@ const ARC_EXPLORER_API_URL = 'https://explorer.testnet.arc.io/api/v2';
 const NATIVE_VALUE_DECIMALS = 18;
 export const ERC20_TRANSFER_ABI = ['function transfer(address to, uint256 amount) returns (bool)'];
 const ASSET_ICON_URLS: Record<string, string> = {
-  USDC: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
-  EURC: 'https://orbmarkets.io/api/icons/euroCoin.png',
-  cirBTC: 'https://assets.coingecko.com/coins/images/102172745/standard/cirbtc.jpg',
-  CIRBTC: 'https://assets.coingecko.com/coins/images/102172745/standard/cirbtc.jpg',
+  USDC: usdcSvg,
+  EURC: eurcSvg,
+  cirBTC: cirbtcSvg,
+  CIRBTC: cirbtcSvg,
 };
 
 export type SendAssetPlan =
@@ -898,7 +902,7 @@ function App() {
   const [sendRecipientError, setSendRecipientError] = useState('');
   const [recipientResolutionStatus, setRecipientResolutionStatus] = useState<'idle' | 'checking' | 'resolved' | 'unsupported'>('idle');
   const [sendAmountError, setSendAmountError] = useState('');
-  const [requestAssetKey, setRequestAssetKey] = useState('usdc');
+  const [requestAssetKey, setRequestAssetKey] = useState('native-usdc');
   const [requestAmount, setRequestAmount] = useState('');
   const [requestNote, setRequestNote] = useState('');
   const [requestAmountError, setRequestAmountError] = useState('');
@@ -1547,25 +1551,20 @@ function App() {
     setPasscodeError(null);
   };
 
-  const requestAssets = useMemo(() => {
-    const sourceAssets = tokenAssets.length > 0 ? tokenAssets : assetBalances;
-    const nonZeroAssets = filterNonZeroAssetBalances(sourceAssets);
-    const hasUsdc = nonZeroAssets.some((asset) => asset.symbol === 'USDC');
-
-    if (hasUsdc) {
-      return nonZeroAssets;
-    }
-
-    return [
-      { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 },
-      ...nonZeroAssets,
-    ];
+  const requestAssets: AssetOption[] = useMemo(() => {
+    // Always include native USDC first so users can always select USDC
+    const nativeUsdc = assetBalances.find((asset) => asset.symbol === 'USDC');
+    const merged = nativeUsdc
+      ? [nativeUsdc, ...tokenAssets.filter((t) => t.symbol !== 'USDC')]
+      : tokenAssets;
+    return filterNonZeroAssetBalances(merged) as unknown as AssetOption[];
   }, [assetBalances, tokenAssets]);
 
   const openRequestModal = () => {
     const defaultAsset = requestAssets.find((asset) => asset.symbol === 'USDC')
-      ?? requestAssets.find((asset) => Number(asset.balance) > 0)
-      ?? { key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 };
+      ?? requestAssets.find((asset) => Number(asset.balance) > 0);
+
+    if (!defaultAsset) return;
 
     setRequestAssetKey(defaultAsset.key);
     setRequestAmount('');
@@ -1604,14 +1603,14 @@ function App() {
     return !error;
   };
 
-  const sendAssets = useMemo(() => {
+  const sendAssets: AssetOption[] = useMemo(() => {
     // Always include native USDC (the gas asset) so the selector is never empty
     // and users can always select USDC even when holding other tokens.
     const nativeUsdc = assetBalances.find((asset) => asset.symbol === 'USDC');
     const merged = nativeUsdc
       ? [nativeUsdc, ...tokenAssets.filter((t) => t.symbol !== 'USDC')]
       : tokenAssets;
-    return filterNonZeroAssetBalances(merged);
+    return filterNonZeroAssetBalances(merged) as unknown as AssetOption[];
   }, [assetBalances, tokenAssets]);
 
   const selectedSendAsset = useMemo(() => {
@@ -2971,8 +2970,13 @@ function App() {
               <button onClick={() => setShowReceive(false)} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
             <div className="mt-6 flex flex-col items-center gap-4">
-              <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+              <div className="relative rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                 <QRCodeSVG value={address} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
+                <img
+                  src={logoForQrUrl}
+                  alt=""
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 pointer-events-none"
+                />
               </div>
               <p className="break-all text-center font-mono text-sm text-[#A1A1AA]">{address}</p>
               <button onClick={copyAddress} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]">
@@ -2991,7 +2995,7 @@ function App() {
               <h3 className="text-xl font-semibold">Request</h3>
               <button onClick={() => {
                 setShowRequest(false);
-                setRequestAssetKey('usdc');
+                setRequestAssetKey('native-usdc');
                 setRequestAmount('');
                 setRequestNote('');
                 setRequestAmountError('');
@@ -2999,24 +3003,16 @@ function App() {
               }} className="text-sm text-[#A1A1AA]">Close</button>
             </div>
             <div className="mt-6 space-y-4">
-              <label className="block text-sm text-[#A1A1AA]">
-                Asset
-                <select
-                  value={requestAssetKey}
-                  onChange={(e) => {
-                    setRequestAssetKey(e.target.value);
-                    setRequestAmountError('');
-                  }}
-                  className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
-                >
-                  {requestAssets.map((asset) => (
-                    <option key={asset.key} value={asset.key}>
-                      {asset.symbol}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
+              <AssetSelector
+                    id="request-asset"
+                    label="Asset"
+                    assets={requestAssets}
+                    value={requestAssetKey}
+                    onChange={(key) => {
+                      setRequestAssetKey(key);
+                      setRequestAmountError('');
+                    }}
+                  />
               <label className="block text-sm text-[#A1A1AA]">
                 Amount
                 <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3">
@@ -3057,8 +3053,13 @@ function App() {
               {requestLink ? (
                 <div className="space-y-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+                    <div className="relative rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                       <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
+                      <img
+                        src={logoUrl}
+                        alt=""
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 pointer-events-none"
+                      />
                     </div>
                     <button
                       onClick={async () => {
@@ -3130,6 +3131,20 @@ function App() {
             </div>
 
             <div className="mt-5 space-y-4">
+              {/* Add contact button */}
+              <button
+                onClick={() => setIsAddContactOpen(!isAddContactOpen)}
+                className={`w-full flex items-center justify-center gap-2 rounded-xl border ${
+                  isAddContactOpen
+                    ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#A78BFA]'
+                    : 'border-white/[0.06] bg-[#16171C] text-[#F5F3FF] hover:text-[#F5F3FF]'
+                } py-2.5 text-sm font-medium transition`}
+                aria-label="Add contact"
+              >
+                {isAddContactOpen ? <X size={18} /> : <Plus size={18} />}
+                Add Contact
+              </button>
+
               {isAddContactOpen && (
                 <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                   <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
@@ -3191,20 +3206,6 @@ function App() {
                   className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] pl-10 pr-4 py-2.5 text-sm text-[#F5F3FF] outline-none"
                 />
               </div>
-
-              {/* Add contact button */}
-              <button
-                onClick={() => setIsAddContactOpen(!isAddContactOpen)}
-                className={`w-full flex items-center justify-center gap-2 rounded-xl border ${
-                  isAddContactOpen
-                    ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#A78BFA]'
-                    : 'border-white/[0.06] bg-[#16171C] text-[#F5F3FF] hover:text-[#F5F3FF]'
-                } py-2.5 text-sm font-medium transition`}
-                aria-label="Add contact"
-              >
-                {isAddContactOpen ? <X size={18} /> : <Plus size={18} />}
-                Add Contact
-              </button>
 
               {/* Filtered contacts list */}
               {(() => {
@@ -3368,7 +3369,10 @@ function App() {
                     label="Asset"
                     assets={sendAssets}
                     value={sendAssetKey}
-                    onChange={(key) => { setSendAssetKey(key); setSendAmountError(''); }}
+                    onChange={(key) => {
+                      setSendAssetKey(key);
+                      setSendAmountError('');
+                    }}
                   />
 
                   {scannedRequestNote ? (
