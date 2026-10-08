@@ -2341,7 +2341,7 @@ function App() {
         {/* Header */}
         <header className="flex items-center justify-between py-1.5">
           <div className="flex items-center gap-2.5">
-            <img src={logoUrl} alt="ArcPay" className="h-7 w-7 object-contain" />
+            <img src={logoUrl} alt="ArcPay" className="h-9 w-9 object-contain" />
             <div className="flex flex-col leading-tight">
               <span className="text-[13px] font-semibold">ArcPay</span>
               <button
@@ -3061,7 +3061,7 @@ function App() {
                 <img
                   src={logoForQrUrl}
                   alt=""
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 pointer-events-none"
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 pointer-events-none"
                 />
               </div>
               <p className="break-all text-center font-mono text-sm text-[#A1A1AA]">{address}</p>
