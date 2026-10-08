@@ -13,23 +13,23 @@
   --ink-3: 150 142 166;
   --glass-fill: 255 255 255 / 0.62;
   --glass-fill-strong: 255 255 255 / 0.82;
-  --glass-border: 108 59 170 / 0.14;
+  --glass-border: 6 148 148 / 0.14;
   --glass-highlight: 255 255 255 / 0.9;
-  --accent: 85 55 150; /* Desaturated purple for a more refined look */
-  --accent-soft: 85 55 150 / 0.10;
-  --accent-glow: 85 55 150 / 0.22;
-  --accent-text: 85 55 150;
+  --accent: 6 148 148; /* Teal accent color */
+  --accent-soft: 6 148 148 / 0.10;
+  --accent-glow: 6 148 148 / 0.22;
+  --accent-text: 6 148 148;
   --positive: 19 138 75;
   --negative: 217 69 59;
-  --shadow-float: 0 10px 30px rgba(40,20,70,0.08), 0 1px 2px rgba(40,20,70,0.05);
+  --shadow-float: 0 10px 30px rgba(0,80,80,0.08), 0 1px 2px rgba(0,80,80,0.05);
   --primary-button-bg: 14 10 22; /* ink */
   --primary-button-fg: 255 255 255;
 }
 
 /* Dark theme */
 [data-theme="dark"] {
-  --bg: 10 8 16;
-  --bg-elevated: 20 16 30;
+  --bg: 12 22 24; /* #0C1618 - Deep teal-black background */
+  --bg-elevated: 18 30 34;
   --ink: 244 240 250;
   --ink-2: 178 170 196;
   --ink-3: 120 112 140;
@@ -37,15 +37,15 @@
   --glass-fill-strong: 255 255 255 / 0.10;
   --glass-border: 255 255 255 / 0.10;
   --glass-highlight: 255 255 255 / 0.14;
-  --accent: 85 55 150; /* Desaturated purple for a more refined look */
-  --accent-soft: 85 55 150 / 0.22;
-  --accent-glow: 85 55 150 / 0.45;
-  --accent-text: 140 110 200;
+  --accent: 6 148 148; /* Teal accent color (#069494) */
+  --accent-soft: 6 148 148 / 0.22;
+  --accent-glow: 6 148 148 / 0.45;
+  --accent-text: 6 148 148;
   --positive: 52 211 153;
   --negative: 248 113 113;
   --shadow-float: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
   --primary-button-bg: 244 240 250;
-  --primary-button-fg: 14 10 22;
+  --primary-button-fg: 12 22 24; /* Match new dark background */
 }
 
 @layer components {
