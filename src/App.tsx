@@ -650,6 +650,13 @@ const PasscodePad = ({
   const title = mode === 'unlock' ? 'Enter PIN' : mode === 'create' ? 'Create PIN' : 'Confirm PIN';
   const submitLabel = mode === 'unlock' ? 'Unlock' : 'Continue';
 
+  // Automatically clear the PIN entry when a wrong passcode is reported
+  useEffect(() => {
+    if (error) {
+      setPin('');
+    }
+  }, [error]);
+
   const handleDigit = (digit: string) => {
     setPin((current) => {
       if (current.length >= 4) return current;
@@ -2336,6 +2343,7 @@ function App() {
           <div className="flex items-center gap-2.5">
             <img src={logoUrl} alt="ArcPay" className="h-7 w-7 object-contain" />
             <div className="flex flex-col leading-tight">
+              <span className="text-[13px] font-semibold">ArcPay</span>
               <button
                 type="button"
                 onClick={() => setShowAccountMenu((prev) => !prev)}
@@ -2345,7 +2353,6 @@ function App() {
               >
                 {accounts.find((a) => a.index === activeAccountIndex)?.label ?? 'Arc Network'}
               </button>
-              <span className="text-[13px] font-semibold">ArcPay</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
