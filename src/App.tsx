@@ -1888,6 +1888,19 @@ function App() {
         await videoRef.current.play();
       }
 
+      // Wait for video to be ready before starting detection
+      await new Promise<void>((resolve) => {
+        const checkReady = () => {
+          if (!videoRef.current) return;
+          if (videoRef.current.readyState >= videoRef.current.HAVE_ENOUGH_DATA) {
+            resolve();
+          } else {
+            requestAnimationFrame(checkReady);
+          }
+        };
+        checkReady();
+      });
+
       const BarcodeDetectorConstructor = (window as Window & typeof globalThis & {
         BarcodeDetector?: BarcodeDetectorCtor;
       }).BarcodeDetector;
@@ -1922,10 +1935,12 @@ function App() {
 
         try {
           const result = await reader.decodeOnceFromVideoDevice(undefined, videoRef.current);
-          const decoded = result?.getText?.().trim();
-          if (decoded) {
+          // Robustly extract text: handle getText() returning string, null, or undefined
+          const decoded = typeof result?.getText === 'function' ? result.getText() : null;
+          const cleanedDecoded = decoded ? String(decoded).trim() : '';
+          if (cleanedDecoded) {
             window.clearInterval(scannerLoopRef.current ?? undefined);
-            handleScanPayload(decoded);
+            handleScanPayload(cleanedDecoded);
           }
         } catch {
           // Ignore decode errors and keep trying.
@@ -2590,7 +2605,7 @@ function App() {
                     setSelectedAssetDetail(null);
                     openSendModal({ presetAssetKey: assetKey });
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#047A7A] to-[#069494] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#058A8A] hover:to-[#069494] active:scale-98 shadow-[0_4px_12px_rgba(139,92,246,0.2)]"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#047A7A] to-[#069494] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#058A8A] hover:to-[#069494] active:scale-98 shadow-[0_4px_12px_rgba(6,148,148,0.2)]"
                 >
                   <Send className="h-4 w-4" />
                   Send
