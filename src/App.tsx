@@ -3165,9 +3165,9 @@ function App() {
                     <div className="relative rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
                       <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
                       <img
-                        src={logoUrl}
+                        src={logoForQrUrl}
                         alt=""
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 pointer-events-none"
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 pointer-events-none"
                       />
                     </div>
                     <button
@@ -3208,8 +3208,8 @@ function App() {
             </div>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0B0C11]">
-              <div className="relative aspect-[4/5] w-full bg-black">
-                <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
+              <div className="relative w-full bg-black">
+                <video ref={videoRef} className="h-full w-full object-contain" playsInline muted autoPlay />
                 <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#069494]/80" />
                 <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20" />
                 {scannerSuccess ? (
