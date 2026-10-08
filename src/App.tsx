@@ -686,14 +686,19 @@ const PasscodePad = ({
           aria-label="PIN entry"
           role="textbox"
         >
-          {Array.from({ length: 4 }).map((_, index) => (
-            <span
-              key={index}
-              className={`h-3 w-3 rounded-full border transition-fast ${
-                pin.length > index ? 'border-[#8B5CF6] bg-[#8B5CF6]' : 'border-white/[0.08] bg-[#16171C]'
-              }`}
-            />
-          ))}
+          {Array.from({ length: 4 }).map((_, index) => {
+            const filled = pin.length > index;
+            return (
+              <span
+                key={index}
+                className={`h-6 w-6 rounded-full border flex items-center justify-center transition-fast ${
+                  filled ? 'border-[#8B5CF6] bg-[#16171C]' : 'border-white/[0.08] bg-[#16171C]'
+                }`}
+              >
+                {filled && <span className="h-2 w-2 rounded-full bg-[#8B5CF6]" />}
+              </span>
+            );
+          })}
         </div>
 
         {error ? <p className="mb-4 text-center text-sm text-rose-500/70">{error}</p> : <div className="mb-4 h-5" />}
@@ -965,9 +970,25 @@ function App() {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [passcodeError, setPasscodeError] = useState<string | null>(null);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const [pinDraft, setPinDraft] = useState('');
   const [pendingPrivateKey, setPendingPrivateKey] = useState<string | null>(null);
   const [pendingWallet, setPendingWallet] = useState<ArcWallet | null>(null);
+
+  // Close account menu when clicking outside
+  useEffect(() => {
+    if (!showAccountMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setShowAccountMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAccountMenu]);
 
   // Seed phrase reveal state
   const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
@@ -2315,7 +2336,15 @@ function App() {
           <div className="flex items-center gap-2.5">
             <img src={logoUrl} alt="ArcPay" className="h-7 w-7 object-contain" />
             <div className="flex flex-col leading-tight">
-              <span className="text-[9px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Arc Network</span>
+              <button
+                type="button"
+                onClick={() => setShowAccountMenu((prev) => !prev)}
+                className="text-[9px] font-medium uppercase tracking-[0.3em] text-[#71717A] hover:text-[#A1A1AA] transition-colors"
+                aria-expanded={showAccountMenu}
+                aria-label="Select account"
+              >
+                {accounts.find((a) => a.index === activeAccountIndex)?.label ?? 'Arc Network'}
+              </button>
               <span className="text-[13px] font-semibold">ArcPay</span>
             </div>
           </div>
@@ -2339,6 +2368,56 @@ function App() {
             </button>
           </div>
         </header>
+
+        {/* Account selector menu */}
+        {showAccountMenu && (
+          <div ref={accountMenuRef} className="relative">
+            <div
+              className="absolute z-50 mt-1 w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overflow-hidden"
+              role="menu"
+              aria-label="Account selector"
+            >
+              <div className="px-4 py-3 border-b border-white/[0.06]">
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Account</p>
+              </div>
+              <div className="py-1">
+                {accounts.map((account) => {
+                  const isActive = account.index === activeAccountIndex;
+                  return (
+                    <button
+                      key={account.index}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        if (!isActive) {
+                          handleSwitchAccountClick(account.index);
+                        }
+                        setShowAccountMenu(false);
+                      }}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-fast ${
+                        isActive ? 'bg-[#8B5CF6]/10' : 'hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
+                          {isActive && (
+                            <span className="rounded-full bg-[#8B5CF6]/20 px-2 py-0.5 text-[10px] font-medium text-[#A78BFA]">
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 truncate text-xs text-[#A1A1AA] font-mono">
+                          {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Total Balance Card */}
         <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#111216] px-6 py-8">

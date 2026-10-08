@@ -15,10 +15,10 @@
   --glass-fill-strong: 255 255 255 / 0.82;
   --glass-border: 108 59 170 / 0.14;
   --glass-highlight: 255 255 255 / 0.9;
-  --accent: 108 59 170;
-  --accent-soft: 108 59 170 / 0.10;
-  --accent-glow: 108 59 170 / 0.22;
-  --accent-text: 108 59 170;
+  --accent: 85 55 150; /* Desaturated purple for a more refined look */
+  --accent-soft: 85 55 150 / 0.10;
+  --accent-glow: 85 55 150 / 0.22;
+  --accent-text: 85 55 150;
   --positive: 19 138 75;
   --negative: 217 69 59;
   --shadow-float: 0 10px 30px rgba(40,20,70,0.08), 0 1px 2px rgba(40,20,70,0.05);
@@ -37,10 +37,10 @@
   --glass-fill-strong: 255 255 255 / 0.10;
   --glass-border: 255 255 255 / 0.10;
   --glass-highlight: 255 255 255 / 0.14;
-  --accent: 108 59 170;
-  --accent-soft: 108 59 170 / 0.22;
-  --accent-glow: 108 59 170 / 0.45;
-  --accent-text: 167 132 224;
+  --accent: 85 55 150; /* Desaturated purple for a more refined look */
+  --accent-soft: 85 55 150 / 0.22;
+  --accent-glow: 85 55 150 / 0.45;
+  --accent-text: 140 110 200;
   --positive: 52 211 153;
   --negative: 248 113 113;
   --shadow-float: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
