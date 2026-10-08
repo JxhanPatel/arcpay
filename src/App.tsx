@@ -675,12 +675,12 @@ const PasscodePad = ({
   return (
     <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
+        <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
       </div>
       <div className="relative w-full max-w-sm rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
-            <Lock className="h-5 w-5 text-[#8B5CF6]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
+            <Lock className="h-5 w-5 text-[#069494]" />
           </div>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Security</p>
@@ -699,10 +699,10 @@ const PasscodePad = ({
               <span
                 key={index}
                 className={`h-6 w-6 rounded-full border flex items-center justify-center transition-fast ${
-                  filled ? 'border-[#8B5CF6] bg-[#16171C]' : 'border-white/[0.08] bg-[#16171C]'
+                  filled ? 'border-[#069494] bg-[#16171C]' : 'border-white/[0.08] bg-[#16171C]'
                 }`}
               >
-                {filled && <span className="h-2 w-2 rounded-full bg-[#8B5CF6]" />}
+                {filled && <span className="h-2 w-2 rounded-full bg-[#069494]" />}
               </span>
             );
           })}
@@ -716,7 +716,7 @@ const PasscodePad = ({
               key={digit}
               type="button"
               onClick={() => handleDigit(digit)}
-              className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
+              className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
             >
               {digit}
             </button>
@@ -725,14 +725,14 @@ const PasscodePad = ({
             type="button"
             onClick={handleBackspace}
             aria-label="Delete last digit"
-            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/40/40"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg text-[#A1A1AA] transition-fast hover:border-[#069494]/40/40"
           >
             ⌫
           </button>
           <button
             type="button"
             onClick={() => handleDigit('0')}
-            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
           >
             0
           </button>
@@ -740,7 +740,7 @@ const PasscodePad = ({
             type="button"
             onClick={() => onComplete(pin)}
             disabled={pin.length < 4}
-            className="press-effect rounded-[14px] bg-[#8B5CF6] py-3 text-sm font-medium text-white transition-normal hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-50"
+            className="press-effect rounded-[14px] bg-[#069494] py-3 text-sm font-medium text-white transition-normal hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>
@@ -804,7 +804,7 @@ const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProp
         aria-expanded={open}
         aria-label={`${label}: ${selected?.symbol ?? 'None'}`}
         onClick={() => setOpen((prev) => !prev)}
-        className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 text-left transition-all duration-200 hover:border-[#8B5CF6]/30 hover:bg-[#16171C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+        className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 text-left transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#16171C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#069494]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
       >
         {selected ? (
           <>
@@ -824,14 +824,14 @@ const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProp
         ) : (
           <span className="text-sm text-[#71717A]">Select asset…</span>
         )}
-        <ChevronRight className={`h-4 w-4 text-[#8B5CF6] opacity-70 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+        <ChevronRight className={`h-4 w-4 text-[#069494] opacity-70 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div
           id={listId}
           role="listbox"
           aria-label={`${label} options`}
-          className="absolute z-50 mt-1 w-full max-h-72 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overflow-hidden overscroll-contain"
+          className="absolute z-50 mt-1 w-full max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overscroll-contain p-1"
         >
           {assets.map((asset) => {
             const zero = isZero(asset);
@@ -846,7 +846,7 @@ const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProp
                 aria-label={`${asset.symbol}, ${formatDisplayBalance(asset.balance)}`}
                 onClick={() => { onChange(asset.key); setOpen(false); }}
                 className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                  active ? 'bg-[#8B5CF6]/10' : 'hover:bg-white/[0.04]'
+                  active ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
                 } ${zero ? 'opacity-60' : ''}`}
               >
                 <img
@@ -863,7 +863,7 @@ const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProp
                     {formatDisplayBalance(asset.balance)} available
                   </span>
                 </div>
-                {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#8B5CF6]" />}
+                {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
               </button>
             );
           })}
@@ -1585,14 +1585,18 @@ function App() {
     const merged = nativeUsdc
       ? [nativeUsdc, ...tokenAssets.filter((t) => t.symbol !== 'USDC')]
       : tokenAssets;
-    return filterNonZeroAssetBalances(merged) as unknown as AssetOption[];
+    const filtered = filterNonZeroAssetBalances(merged);
+    // Ensure we always have at least one asset (USDC as fallback)
+    return filtered.length > 0 
+      ? (filtered as unknown as AssetOption[]) 
+      : [{ key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 }];
   }, [assetBalances, tokenAssets]);
 
   const openRequestModal = () => {
     const defaultAsset = requestAssets.find((asset) => asset.symbol === 'USDC')
-      ?? requestAssets.find((asset) => Number(asset.balance) > 0);
-
-    if (!defaultAsset) return;
+      ?? requestAssets.find((asset) => Number(asset.balance) > 0)
+      // Fallback to native USDC even if balance is zero or assets haven't loaded yet
+      ?? { key: 'native-usdc', symbol: 'USDC', balance: '0', decimals: 18 };
 
     setRequestAssetKey(defaultAsset.key);
     setRequestAmount('');
@@ -1638,7 +1642,11 @@ function App() {
     const merged = nativeUsdc
       ? [nativeUsdc, ...tokenAssets.filter((t) => t.symbol !== 'USDC')]
       : tokenAssets;
-    return filterNonZeroAssetBalances(merged) as unknown as AssetOption[];
+    const filtered = filterNonZeroAssetBalances(merged);
+    // Ensure we always have at least one asset (USDC as fallback)
+    return filtered.length > 0 
+      ? (filtered as unknown as AssetOption[]) 
+      : [{ key: 'usdc', symbol: 'USDC', balance: '0', decimals: 6 }];
   }, [assetBalances, tokenAssets]);
 
   const selectedSendAsset = useMemo(() => {
@@ -2200,12 +2208,12 @@ function App() {
     return (
       <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
+          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
         </div>
         <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
-              <Wallet className="h-5 w-5 text-[#8B5CF6]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#069494]" />
             </div>
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Backup</p>
@@ -2235,7 +2243,7 @@ function App() {
                 <button
                   type="button"
                   onClick={copyMnemonic}
-                  className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF] transition-fast hover:border-[#8B5CF6]/40"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF] transition-fast hover:border-[#069494]/40"
                 >
                   <Copy className="h-4 w-4" />
                   {copiedPhrase ? 'Copied!' : 'Copy phrase'}
@@ -2250,7 +2258,7 @@ function App() {
                   id="confirmMnemonic"
                   checked={hasConfirmedMnemonicSave}
                   onChange={(e) => setHasConfirmedMnemonicSave(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-white/[0.08] bg-[#0B0C11] text-[#8B5CF6] focus:ring-[#8B5CF6] focus:ring-offset-0"
+                  className="mt-1 h-4 w-4 rounded border-white/[0.08] bg-[#0B0C11] text-[#069494] focus:ring-[#069494] focus:ring-offset-0"
                 />
                 <label htmlFor="confirmMnemonic" className="text-[14px] text-[#A1A1AA]">
                   I have saved my recovery phrase somewhere safe.
@@ -2261,7 +2269,7 @@ function App() {
                 type="button"
                 onClick={handleConfirmMnemonicSave}
                 disabled={!hasConfirmedMnemonicSave}
-                className="press-effect w-full flex items-center justify-center gap-2 rounded-[14px] bg-[#8B5CF6] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#7C3AED] disabled:opacity-70"
+                className="press-effect w-full flex items-center justify-center gap-2 rounded-[14px] bg-[#069494] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#058A8A] disabled:opacity-70"
               >
                 Continue
               </button>
@@ -2279,12 +2287,12 @@ function App() {
     return (
       <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#8B5CF6]/[0.07] blur-3xl" />
+          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
         </div>
         <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8B5CF6]/[0.10]">
-              <Wallet className="h-5 w-5 text-[#8B5CF6]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#069494]" />
             </div>
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Self-custodial</p>
@@ -2301,7 +2309,7 @@ function App() {
             <button
               onClick={handleCreateWallet}
               disabled={isLoading || isProcessing}
-              className="press-effect flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#8B5CF6] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#7C3AED]"
+              className="press-effect flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#069494] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#058A8A]"
             >
               <Download className="h-4 w-4" />
               {isLoading || isProcessing ? 'Preparing…' : 'Create New Wallet'}
@@ -2314,12 +2322,12 @@ function App() {
                 onChange={(e) => setImportInput(e.target.value)}
                 rows={4}
                 placeholder="12-word seed phrase or 0x private key"
-                className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus:border-[#8B5CF6]/30 transition-fast"
+                className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus:border-[#069494]/30 transition-fast"
               />
               <button
                 onClick={handleImportWallet}
                 disabled={isLoading || isProcessing}
-                className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#111216] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#8B5CF6]/40/40 hover:bg-[#8B5CF6]/[0.06]"
+                className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#111216] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
               >
                 <Upload className="h-4 w-4" />
                 Import Wallet
@@ -2402,14 +2410,14 @@ function App() {
                         setShowAccountMenu(false);
                       }}
                       className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-fast ${
-                        isActive ? 'bg-[#8B5CF6]/10' : 'hover:bg-white/[0.04]'
+                        isActive ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
                           {isActive && (
-                            <span className="rounded-full bg-[#8B5CF6]/20 px-2 py-0.5 text-[10px] font-medium text-[#A78BFA]">
+                            <span className="rounded-full bg-[#069494]/20 px-2 py-0.5 text-[10px] font-medium text-[#069494]">
                               Active
                             </span>
                           )}
@@ -2428,9 +2436,9 @@ function App() {
 
         {/* Total Balance Card */}
         <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#111216] px-6 py-8">
-          {/* Subtle purple ambient glow */}
-          <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#8B5CF6]/[0.06] blur-3xl" />
-          <div className="pointer-events-none absolute -left-4 bottom-0 h-24 w-24 rounded-full bg-[#8B5CF6]/[0.04] blur-2xl" />
+          {/* Subtle teal ambient glow */}
+          <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#069494]/[0.06] blur-3xl" />
+          <div className="pointer-events-none absolute -left-4 bottom-0 h-24 w-24 rounded-full bg-[#069494]/[0.04] blur-2xl" />
           <div className="relative">
             <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Total Balance</p>
             <h2 className="mt-3 text-[40px] font-bold leading-none tracking-tight text-[#F5F3FF]">
@@ -2440,10 +2448,10 @@ function App() {
               <span className="text-[12px] text-[#71717A]">Testnet · {ARC_NETWORK_NAME}</span>
               <button
                 onClick={() => void refreshWalletData()}
-                className="group flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] transition-fast hover:border-[#8B5CF6]/30 hover:bg-[#8B5CF6]/[0.08]"
+                className="group flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] transition-fast hover:border-[#069494]/30 hover:bg-[#069494]/[0.08]"
                 aria-label="Refresh"
               >
-                <RefreshCcw className="h-3 w-3 text-[#71717A] transition-fast group-hover:text-[#A78BFA]" />
+                <RefreshCcw className="h-3 w-3 text-[#71717A] transition-fast group-hover:text-[#069494]" />
               </button>
             </div>
           </div>
@@ -2455,7 +2463,7 @@ function App() {
             onClick={() => openSendModal()}
             className="group flex flex-col items-center gap-2"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
               <Send className="h-[18px] w-[18px]" />
             </span>
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Send</span>
@@ -2464,7 +2472,7 @@ function App() {
             onClick={() => setShowReceive(true)}
             className="group flex flex-col items-center gap-2"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
               <Download className="h-[18px] w-[18px]" />
             </span>
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Receive</span>
@@ -2473,7 +2481,7 @@ function App() {
             onClick={openRequestModal}
             className="group flex flex-col items-center gap-2"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
               <QrCode className="h-[18px] w-[18px]" />
             </span>
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Request</span>
@@ -2482,7 +2490,7 @@ function App() {
             onClick={() => setShowHistory(true)}
             className="group flex flex-col items-center gap-2"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#8B5CF6]/30 group-hover:bg-[#8B5CF6]/[0.08] group-hover:text-[#A78BFA] group-active:scale-95">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
               <Clock className="h-[18px] w-[18px]" />
             </span>
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">History</span>
@@ -2504,7 +2512,7 @@ function App() {
                   key={asset.key}
                   type="button"
                   onClick={() => setSelectedAssetDetail(asset.key)}
-                  className="group flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-3.5 text-left transition-fast hover:bg-[#8B5CF6]/[0.04]"
+                  className="group flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-3.5 text-left transition-fast hover:bg-[#069494]/[0.04]"
                 >
                   <div className="flex items-center gap-3">
                     <img
@@ -2514,7 +2522,7 @@ function App() {
                       onError={(event) => {
                         event.currentTarget.style.display = 'none';
                         const fallback = document.createElement('div');
-                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#8B5CF6]/20 bg-[#8B5CF6]/[0.08] text-[11px] font-semibold text-[#A78BFA]';
+                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#069494]/20 bg-[#069494]/[0.08] text-[11px] font-semibold text-[#069494]';
                         fallback.textContent = asset.symbol.slice(0, 2).toUpperCase();
                         event.currentTarget.parentElement?.appendChild(fallback);
                       }}
@@ -2528,7 +2536,7 @@ function App() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <p className="font-mono text-[13px] font-semibold text-[#F5F3FF]">${formatDisplayBalance(usdEstimate ?? 0)}</p>
-                    <ChevronRight className="h-4 w-4 text-[#71717A] transition-fast group-hover:text-[#A78BFA]" />
+                    <ChevronRight className="h-4 w-4 text-[#71717A] transition-fast group-hover:text-[#069494]" />
                   </div>
                 </button>
                 );
@@ -2539,7 +2547,7 @@ function App() {
           )}
         </section>
 
-        {copied ? <p className="text-center text-[11px] font-medium text-[#A78BFA]">Address copied</p> : null}
+        {copied ? <p className="text-center text-[11px] font-medium text-[#069494]">Address copied</p> : null}
       </div>
 
       {selectedAssetDetail ? (() => {
@@ -2568,7 +2576,7 @@ function App() {
                 </div>
                 <button 
                   onClick={() => setSelectedAssetDetail(null)}
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-[#069494]/50"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -2582,7 +2590,7 @@ function App() {
                     setSelectedAssetDetail(null);
                     openSendModal({ presetAssetKey: assetKey });
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#6D28D9] to-[#8B5CF6] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#7C3AED] hover:to-[#A78BFA] active:scale-98 shadow-[0_4px_12px_rgba(139,92,246,0.2)]"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#047A7A] to-[#069494] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#058A8A] hover:to-[#069494] active:scale-98 shadow-[0_4px_12px_rgba(139,92,246,0.2)]"
                 >
                   <Send className="h-4 w-4" />
                   Send
@@ -2603,7 +2611,7 @@ function App() {
                 <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Activity</p>
                 <button 
                   onClick={() => void refreshTransactionHistory()} 
-                  className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#8B5CF6]"
+                  className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#069494]"
                 >
                   <RefreshCcw className="h-3 w-3" />
                   Refresh
@@ -2697,14 +2705,14 @@ function App() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => void refreshTransactionHistory()} 
-                  className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#11131A] px-3 py-2 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#8B5CF6] hover:border-white/[0.12]"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#11131A] px-3 py-2 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#069494] hover:border-white/[0.12]"
                 >
                   <RefreshCcw className="h-3.5 w-3.5" />
                   Refresh
                 </button>
                 <button 
                   onClick={() => setShowHistory(false)} 
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-[#069494]/50"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -2822,11 +2830,11 @@ function App() {
                   setShowSettings(false);
                   setShowContacts(true);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-left text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-left text-[#F5F3FF] transition hover:border-[#069494]/40"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
-                    <Users className="h-4 w-4 text-[#A78BFA]" />
+                    <Users className="h-4 w-4 text-[#069494]" />
                   </div>
                   <span className="text-sm font-medium">Manage Contacts</span>
                 </div>
@@ -2834,7 +2842,7 @@ function App() {
               </button>
 
               <div className="pt-4 border-t border-white/[0.06]">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#8B5CF6] mb-3">Accounts</p>
+                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#069494] mb-3">Accounts</p>
                 <div className="space-y-2">
                   {accounts.map((account) => {
                     const isActive = account.index === activeAccountIndex;
@@ -2858,7 +2866,7 @@ function App() {
                                 setEditingAccountIndex(null);
                                 setEditingAccountLabel('');
                               }}
-                              className="rounded-lg bg-[#8B5CF6] px-2.5 py-1.5 text-xs font-medium text-white"
+                              className="rounded-lg bg-[#069494] px-2.5 py-1.5 text-xs font-medium text-white"
                             >
                               Save
                             </button>
@@ -2879,7 +2887,7 @@ function App() {
                               <div className="flex items-center gap-2">
                                 <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
                                 {isActive && (
-                                  <span className="rounded-full bg-[#8B5CF6]/20 px-2 py-0.5 text-[10px] font-medium text-[#A78BFA]">
+                                  <span className="rounded-full bg-[#069494]/20 px-2 py-0.5 text-[10px] font-medium text-[#069494]">
                                     Active
                                   </span>
                                 )}
@@ -2893,7 +2901,7 @@ function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleSwitchAccountClick(account.index)}
-                                  className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
+                                  className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#F5F3FF] transition hover:border-[#069494]/40"
                                 >
                                   Switch
                                 </button>
@@ -2960,7 +2968,7 @@ function App() {
                   type="button"
                   onClick={() => void handleAddAccount()}
                   disabled={!hasSessionSeed || isAddingAccount}
-                  className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#8B5CF6]/20 bg-[#8B5CF6]/[0.06] px-4 py-2.5 text-sm font-medium text-[#A78BFA] transition-normal hover:border-[#8B5CF6]/40 hover:bg-[#8B5CF6]/[0.10] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#069494]/20 bg-[#069494]/[0.06] px-4 py-2.5 text-sm font-medium text-[#069494] transition-normal hover:border-[#069494]/40 hover:bg-[#069494]/[0.10] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isAddingAccount ? (
                     <>
@@ -3035,7 +3043,7 @@ function App() {
                       </button>
                       <button
                         onClick={() => setConfirmRemoval(false)}
-                        className="flex-1 rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
+                        className="flex-1 rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition hover:border-[#069494]/40"
                       >
                         Cancel
                       </button>
@@ -3187,11 +3195,11 @@ function App() {
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0B0C11]">
               <div className="relative aspect-[4/5] w-full bg-black">
                 <video ref={videoRef} className="h-full w-full object-cover" playsInline muted autoPlay />
-                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#8B5CF6]/80" />
+                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#069494]/80" />
                 <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20" />
                 {scannerSuccess ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#8B5CF6]/10 backdrop-blur-[1px]">
-                    <div className="rounded-full border border-[#8B5CF6]/40 bg-[#111216]/80 px-4 py-2 text-sm font-medium text-[#A78BFA]">
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#069494]/10 backdrop-blur-[1px]">
+                    <div className="rounded-full border border-[#069494]/40 bg-[#111216]/80 px-4 py-2 text-sm font-medium text-[#069494]">
                       Scan complete
                     </div>
                   </div>
@@ -3222,7 +3230,7 @@ function App() {
                 onClick={() => setIsAddContactOpen(!isAddContactOpen)}
                 className={`w-full flex items-center justify-center gap-2 rounded-xl border ${
                   isAddContactOpen
-                    ? 'border-[#8B5CF6] bg-[#8B5CF6]/10 text-[#A78BFA]'
+                    ? 'border-[#069494] bg-[#069494]/10 text-[#069494]'
                     : 'border-white/[0.06] bg-[#16171C] text-[#F5F3FF] hover:text-[#F5F3FF]'
                 } py-2.5 text-sm font-medium transition`}
                 aria-label="Add contact"
@@ -3264,13 +3272,13 @@ function App() {
                           }
                         }}
                         disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
-                        className="rounded-xl bg-[#8B5CF6] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-xl bg-[#069494] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Add
                       </button>
                       {addContactStatus === 'resolving' ? (
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#A78BFA]">
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#8B5CF6]" />
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#069494]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#069494]">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#069494]" />
                           Resolving…
                         </div>
                       ) : null}
@@ -3315,7 +3323,7 @@ function App() {
                           }}
                           className="flex min-w-0 flex-1 items-center gap-3 text-left"
                         >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[11px] font-semibold text-[#A78BFA]">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#069494]/15 text-[11px] font-semibold text-[#069494]">
                             {formatContactLabel(contact)
                               .split(/\s+/)
                               .filter(Boolean)
@@ -3434,7 +3442,7 @@ function App() {
                       ) : null;
                     })()}
                     {isResolvingArcName ? (
-                      <div className="mt-3 rounded-xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
+                      <div className="mt-3 rounded-xl border border-[#069494]/30 bg-[#0B0C11] p-3 text-sm text-[#069494]">
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3443,7 +3451,7 @@ function App() {
                   <button
                     onClick={() => void handleSend()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#8B5CF6] px-4 py-3 font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Sending…' : 'Send Now'}
                   </button>
@@ -3462,7 +3470,7 @@ function App() {
                   />
 
                   {scannedRequestNote ? (
-                    <div className="rounded-2xl border border-[#8B5CF6]/30 bg-[#0B0C11] p-3 text-sm text-[#A78BFA]">
+                    <div className="rounded-2xl border border-[#069494]/30 bg-[#0B0C11] p-3 text-sm text-[#069494]">
                       <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Requested</p>
                       <p className="mt-2 break-words text-[#F5F3FF]">{scannedRequestNote}</p>
                     </div>
@@ -3471,7 +3479,7 @@ function App() {
                   <label className="block text-sm text-[#A1A1AA]">
                     <span className="mb-2 block">Recipient</span>
                     <div className="relative mt-2">
-                      <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#8B5CF6]/30'}`}>
+                      <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#069494]/30'}`}>
                         <input
                           value={sendAddress}
                           onChange={(e) => {
@@ -3489,7 +3497,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => setShowContactPicker((current) => !current)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition hover:border-[#8B5CF6]/40 hover:text-[#F5F3FF]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition hover:border-[#069494]/40 hover:text-[#F5F3FF]"
                           aria-label="Open contacts"
                         >
                           <Users className="h-4 w-4" />
@@ -3501,7 +3509,7 @@ function App() {
                           <button
                             type="button"
                             onClick={() => setShowContactLabelInput((current) => !current)}
-                            className="rounded-full border border-white/[0.06] bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#F5F3FF] transition hover:border-[#8B5CF6]/40"
+                            className="rounded-full border border-white/[0.06] bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#F5F3FF] transition hover:border-[#069494]/40"
                           >
                             Save
                           </button>
@@ -3511,7 +3519,7 @@ function App() {
                             type="button"
                             onClick={() => void handleCheckArcName()}
                             disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
-                            className="rounded-full border border-[#8B5CF6]/40 bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#A78BFA] transition hover:border-[#8B5CF6]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="rounded-full border border-[#069494]/40 bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#069494] transition hover:border-[#069494]/40 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
                           </button>
@@ -3537,9 +3545,9 @@ function App() {
                                     setShowContactPicker(false);
                                     validateSendRecipient(contact.address);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-left transition hover:border-[#8B5CF6]/40"
+                                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-left transition hover:border-[#069494]/40"
                                 >
-                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8B5CF6]/15 text-[10px] font-semibold text-[#A78BFA]">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#069494]/15 text-[10px] font-semibold text-[#069494]">
                                     {formatContactLabel(contact)
                                       .split(/\s+/)
                                       .filter(Boolean)
@@ -3570,7 +3578,7 @@ function App() {
                         <button
                           type="button"
                           onClick={handleSaveCurrentContact}
-                          className="rounded-xl bg-[#8B5CF6] px-3 py-2 text-xs font-medium text-white"
+                          className="rounded-xl bg-[#069494] px-3 py-2 text-xs font-medium text-white"
                         >
                           Save
                         </button>
@@ -3600,8 +3608,8 @@ function App() {
                       </p>
                     ) : null}
                     {isResolvingArcName ? (
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#8B5CF6]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#A78BFA]">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#8B5CF6]" />
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#069494]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#069494]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#069494]" />
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3626,7 +3634,7 @@ function App() {
                           setSendAmountError('');
                         }}
                         disabled={txState === 'pending'}
-                        className="rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1 text-[11px] font-medium text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/30 hover:text-[#F5F3FF]"
+                        className="rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1 text-[11px] font-medium text-[#A1A1AA] transition-fast hover:border-[#069494]/30 hover:text-[#F5F3FF]"
                       >
                         Max
                       </button>
@@ -3645,7 +3653,7 @@ function App() {
                             setSendAmountError('');
                           }}
                           disabled={txState === 'pending'}
-                          className="flex-1 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-xs font-medium text-[#A1A1AA] transition-fast hover:border-[#8B5CF6]/30 hover:text-[#F5F3FF]"
+                          className="flex-1 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-xs font-medium text-[#A1A1AA] transition-fast hover:border-[#069494]/30 hover:text-[#F5F3FF]"
                         >
                           {percent}%
                         </button>
@@ -3657,7 +3665,7 @@ function App() {
                   <button
                     onClick={() => void handleSendReview()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#8B5CF6] px-4 py-3 font-medium text-white transition hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Confirming…' : 'Confirm payment'}
                   </button>
@@ -3665,12 +3673,12 @@ function App() {
               )}
 
               {txState === 'confirming' && txHash ? (
-                <div className="rounded-2xl border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 p-3 text-sm text-[#A78BFA]">
+                <div className="rounded-2xl border border-[#069494]/40 bg-[#069494]/10 p-3 text-sm text-[#069494]">
                   <div className="flex items-center gap-2">
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     <p>{txConfirmationTimedOut ? 'Still confirming — check the explorer' : 'Confirming on-chain…'}</p>
                   </div>
-                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#A78BFA]">
+                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#069494]">
                     View on explorer <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
@@ -3714,11 +3722,11 @@ function App() {
           <button
             onClick={() => setShowScanner(true)}
             aria-label="Scan QR code"
-            className="group relative -mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#8B5CF6] text-white shadow-scan transition-normal hover:bg-[#7C3AED] hover:shadow-scan-hover active:scale-95"
+            className="group relative -mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#069494] text-white shadow-scan transition-normal hover:bg-[#058A8A] hover:shadow-scan-hover active:scale-95"
           >
             <ScanLine className="h-6 w-6" strokeWidth={2} />
             {/* Subtle pulse ring on hover */}
-            <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#8B5CF6]/30 transition-normal group-hover:ring-[#8B5CF6]/50" />
+            <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#069494]/30 transition-normal group-hover:ring-[#069494]/50" />
           </button>
 
           {/* Right: Settings */}
