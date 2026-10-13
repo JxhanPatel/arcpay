@@ -7,13 +7,11 @@ import { formatGasFeeUsdc } from '../gasEstimate';
 import { getAssetUsdPrice, getAssetUsdValue, formatTokenBalance, getAssetDecimals } from '../balance';
 import usdcSvg from '../assets/usdc.svg';
 import eurcSvg from '../assets/eurc.svg';
-import cirbtcSvg from '../assets/cirbtc.svg';
+
 
 const ASSET_ICON_URLS: Record<string, string> = {
   USDC: usdcSvg,
   EURC: eurcSvg,
-  CIRBTC: cirbtcSvg,
-  cirBTC: cirbtcSvg,
 };
 
 type AssetOption = {
@@ -47,6 +45,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   const [gasFeeUsdc, setGasFeeUsdc] = useState<string | null>(null);
   const [isEstimatingGasFee, setIsEstimatingGasFee] = useState(false);
   const [gasFeeError, setGasFeeError] = useState<string | null>(null);
+  const [gasFeeWarning, setGasFeeWarning] = useState<string | null>(null);
 
   // State to store dropdown positions for portal rendering
   const [dropdownPositions, setDropdownPositions] = useState<Record<'from' | 'to', { x: number; y: number; width: number } | null>>({
@@ -63,9 +62,15 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       const ref = type === 'from' ? fromDropdownRef : toDropdownRef;
       if (ref.current && openDropdown === type) {
         const rect = ref.current.getBoundingClientRect();
+        const width = Math.max(rect.width, 240);
+        const maxAvailableWidth = window.innerWidth - 16;
+        const clampedWidth = width > maxAvailableWidth ? maxAvailableWidth : width;
+        const height = rect.height;
+        const x = Math.min(rect.left, window.innerWidth - clampedWidth - 8);
+        const y = Math.min(rect.bottom, window.innerHeight - height - 8);
         setDropdownPositions(prev => ({
           ...prev,
-          [type]: { x: rect.left, y: rect.bottom, width: rect.width }
+          [type]: { x, y, width: clampedWidth }
         }));
       } else if (openDropdown !== type) {
         // Clear position when dropdown is closed
@@ -86,16 +91,28 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     const handleResize = () => {
       if (openDropdown === 'from' && fromDropdownRef.current) {
         const rect = fromDropdownRef.current.getBoundingClientRect();
+        const width = Math.max(rect.width, 240);
+        const maxAvailableWidth = window.innerWidth - 16;
+        const clampedWidth = width > maxAvailableWidth ? maxAvailableWidth : width;
+        const height = rect.height;
+        const x = Math.min(rect.left, window.innerWidth - clampedWidth - 8);
+        const y = Math.min(rect.bottom, window.innerHeight - height - 8);
         setDropdownPositions(prev => ({
           ...prev,
-          from: { x: rect.left, y: rect.bottom, width: rect.width }
+          from: { x, y, width: clampedWidth }
         }));
       }
       if (openDropdown === 'to' && toDropdownRef.current) {
         const rect = toDropdownRef.current.getBoundingClientRect();
+        const width = Math.max(rect.width, 240);
+        const maxAvailableWidth = window.innerWidth - 16;
+        const clampedWidth = width > maxAvailableWidth ? maxAvailableWidth : width;
+        const height = rect.height;
+        const x = Math.min(rect.left, window.innerWidth - clampedWidth - 8);
+        const y = Math.min(rect.bottom, window.innerHeight - height - 8);
         setDropdownPositions(prev => ({
           ...prev,
-          to: { x: rect.left, y: rect.bottom, width: rect.width }
+          to: { x, y, width: clampedWidth }
         }));
       }
     };
@@ -135,7 +152,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   }
 
   // Ensure all supported tokens are present (fill in missing ones)
-  const SUPPORTED_TOKENS = ['USDC', 'EURC', 'cirBTC'] as const;
+  const SUPPORTED_TOKENS = ['USDC', 'EURC'] as const;
   for (const symbol of SUPPORTED_TOKENS) {
     if (!seen.has(symbol)) {
       // Find the asset from either source
@@ -144,7 +161,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     }
   }
 
-  const assetOptions: AssetOption[] = combinedAssets;
+  const assetOptions: AssetOption[] = combinedAssets.filter(a => a.symbol !== 'cirBTC');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -225,11 +242,15 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     handleSwap();
   };
 
+  // Fallback gas limit for swaps when gas estimation fails (e.g., missing revert data)
+  const DEFAULT_SWAP_GAS_LIMIT = 250000n;
+
   const estimateGasFee = async () => {
     if (!quote || !amount) return;
     
     setIsEstimatingGasFee(true);
     setGasFeeError(null);
+    setGasFeeWarning(null);
     
     try {
       // Build the swap transaction plan to get the router address
@@ -262,8 +283,17 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
           data: calldata,
         });
       } catch (err) {
-        setGasFeeError('Unable to estimate gas');
-        return;
+        // Check if this is the specific "missing revert data" error (CALL_EXCEPTION)
+        const error = err as any;
+        if (error?.code === 'CALL_EXCEPTION' && error?.message?.includes('missing revert data')) {
+          // Use fallback gas limit and set a warning
+          gasLimit = DEFAULT_SWAP_GAS_LIMIT;
+          setGasFeeWarning('Gas estimation unavailable — using default estimate');
+        } else {
+          // Other estimation errors
+          setGasFeeError('Unable to estimate gas');
+          return;
+        }
       }
       
       // Fetch gas price
@@ -300,7 +330,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     // Swap fromToken and toToken
     const temp = fromToken;
     setFromToken(toToken);
-    setToToken(temp as 'USDC' | 'EURC' | 'cirBTC');
+    setToToken(temp as 'USDC' | 'EURC');
     // Clear any existing quote and error states
     setQuote(null);
     setError(null);
@@ -449,7 +479,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
               aria-expanded={openDropdown === 'from'}
             >
               <img
-                src={ASSET_ICON_URLS[fromToken] ?? ASSET_ICON_URLS.CIRBTC}
+                src={ASSET_ICON_URLS[fromToken]}
                 alt=""
                 className="h-6 w-6 rounded-full"
               />
@@ -469,6 +499,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                     left: dropdownPositions.from?.x ?? 0,
                     top: dropdownPositions.from?.y ?? 0,
                     width: dropdownPositions.from?.width ?? 0,
+                    minWidth: 240,
                   }}
                   className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
                 >
@@ -495,7 +526,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                         } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <img
-                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
+                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol]}
                           alt=""
                           className="h-8 w-8 rounded-full shadow-sm"
                         />
@@ -572,7 +603,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
               aria-expanded={openDropdown === 'to'}
             >
               <img
-                src={ASSET_ICON_URLS[toToken] ?? ASSET_ICON_URLS.CIRBTC}
+                src={ASSET_ICON_URLS[toToken]}
                 alt=""
                 className="h-6 w-6 rounded-full"
               />
@@ -592,6 +623,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                     left: dropdownPositions.to?.x ?? 0,
                     top: dropdownPositions.to?.y ?? 0,
                     width: dropdownPositions.to?.width ?? 0,
+                    minWidth: 240,
                   }}
                   className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
                 >
@@ -618,7 +650,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                         } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <img
-                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
+                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol]}
                           alt=""
                           className="h-8 w-8 rounded-full shadow-sm"
                         />
@@ -673,9 +705,14 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
         <div className="mb-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
           <div className="flex items-center justify-between text-sm">
             <span className="text-[#71717A]">Network Fee (USDC)</span>
-            <span className="font-medium text-[#F5F3FF]">
-              {isEstimatingGasFee ? 'Estimating...' : gasFeeError ? 'Unable to estimate' : gasFeeUsdc}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="font-medium text-[#F5F3FF]">
+                {isEstimatingGasFee ? 'Estimating...' : gasFeeError ? 'Unable to estimate' : gasFeeUsdc}
+              </span>
+              {gasFeeWarning && (
+                <span className="text-xs text-amber-400/80 mt-0.5">{gasFeeWarning}</span>
+              )}
+            </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
             <span className="text-[#71717A]">Exchange Rate</span>

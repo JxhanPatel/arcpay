@@ -91,11 +91,8 @@ export const NATIVE_USDC_ADDRESS =
 /** Address of EURC on Arc Testnet (6-decimal ERC-20). */
 export const EURC_ADDRESS = '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a';
 
-/** Address of cirBTC on Arc Testnet (8-decimal ERC-20). */
-export const CIRBTC_ADDRESS = '0xf0c478d00b584d30c22168C34C2B28F6389F32Bf';
-
 /** Supported token symbols in ArcPay. */
-export const SUPPORTED_TOKENS = ['USDC', 'EURC', 'cirBTC'] as const;
+export const SUPPORTED_TOKENS = ['USDC', 'EURC'] as const;
 
 /**
  * Checks whether a token symbol is a supported token in ArcPay.
@@ -117,8 +114,6 @@ export function getTokenAddress(symbol: string): string {
       return NATIVE_USDC_ADDRESS;
     case 'EURC':
       return EURC_ADDRESS;
-    case 'CIRBTC':
-      return CIRBTC_ADDRESS;
     default:
       throw new Error(`Unsupported token: ${symbol}`);
   }
@@ -324,7 +319,7 @@ export function buildSwapTransactionPlan(
 /**
  * Builds a token approval plan, if the swap requires an ERC-20 allowance.
  *
- * All tokens on Arc Testnet (USDC, EURC, cirBTC) are ERC-20 tokens and require
+ * All tokens on Arc Testnet (USDC, EURC) are ERC-20 tokens and require
  * approval of the router to spend them on behalf of the user.
  *
  * @param tokenSymbol - The token being swapped.
