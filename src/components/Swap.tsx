@@ -32,6 +32,8 @@ type SwapProps = {
 export default function Swap({ provider, wallet, assetBalances, tokenAssets, onSwapSuccess }: SwapProps) {
   type ActionStage = 'get-quote' | 'review' | 'swap';
 
+  type SwapStatus = 'idle' | 'processing' | 'success' | 'failed';
+
   const [fromToken, setFromToken] = useState('USDC');
   const [toToken, setToToken] = useState('EURC');
   const [amount, setAmount] = useState('');
@@ -40,6 +42,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   const [quote, setQuote] = useState<{ inputAmount: string; outputAmount: string; rate: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<'from' | 'to' | null>(null);
+  const [swapStatus, setSwapStatus] = useState<SwapStatus>('idle');
   
   // Gas fee estimation states
   const [gasFeeUsdc, setGasFeeUsdc] = useState<string | null>(null);
@@ -137,6 +140,14 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     }
   };
 
+  // Format balance to 2 decimal places
+  const formatBalance = (balance: string | undefined): string => {
+    if (balance === undefined || balance === '') return '0.00';
+    const num = Number(balance);
+    if (isNaN(num)) return '0.00';
+    return num.toFixed(2);
+  };
+
   // Add USDC first if present in assetBalances
   const usdcFromBalances = assetBalances.find((a) => a.symbol === 'USDC');
   if (usdcFromBalances) addIfUnique(usdcFromBalances);
@@ -194,6 +205,17 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     }
   }, [actionStage, quote, isLoading]);
 
+  // Auto-clear swap status indicator after 5 seconds
+  useEffect(() => {
+    if (swapStatus === 'success' || swapStatus === 'failed') {
+      const timer = setTimeout(() => {
+        setSwapStatus('idle');
+        setError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [swapStatus]);
+
   // Estimate gas fee when quote or tokens change
   useEffect(() => {
     if (quote && amount && wallet?.address) {
@@ -224,6 +246,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   const handleGetQuote = async () => {
     setIsLoading(true);
     setError(null);
+    setSwapStatus('idle');
     try {
       validateSwapAmount(amount, fromToken, getTokenBalance(fromToken));
       const result = await getSwapQuote(fromToken, toToken, amount);
@@ -335,6 +358,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     setQuote(null);
     setError(null);
     setActionStage('get-quote'); // Reset to initial stage
+    setSwapStatus('idle');
   };
 
   const handleSwap = async () => {
@@ -342,6 +366,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
 
     setIsLoading(true);
     setError(null);
+    setSwapStatus('processing');
 
     try {
       validateSwapAmount(amount, fromToken, getTokenBalance(fromToken));
@@ -425,8 +450,10 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       await tx.wait();
 
       onSwapSuccess();
+      setSwapStatus('success');
     } catch (e: any) {
       setError(e.message || 'Swap failed');
+      setSwapStatus('failed');
     } finally {
       setIsLoading(false);
     }
@@ -451,7 +478,30 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
               onChange={(e) => setAmount(e.target.value)}
               className="w-full bg-transparent text-3xl font-display font-medium text-[#F5F3FF] placeholder:text-[#71717A] focus:outline-none"
             />
-            {/* Fiat value underneath */}
+            {/* Percentage options */}
+            <div className="grid grid-cols-4 gap-2 mt-2.5">
+              {(() => {
+                const balanceStr = getTokenBalance(fromToken);
+                const balanceNum = Number(balanceStr || '0');
+                const options = [
+                  { label: '25%', value: (balanceNum * 0.25).toFixed(2) },
+                  { label: '50%', value: (balanceNum * 0.50).toFixed(2) },
+                  { label: '75%', value: (balanceNum * 0.75).toFixed(2) },
+                  { label: 'Max', value: balanceNum.toFixed(2) },
+                ];
+                return options.map(({ label, value }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setAmount(value)}
+                    disabled={balanceNum <= 0}
+                    className="rounded-xl border border-white/[0.08] bg-[#16171C] px-2.5 py-1.5 text-[10px] font-medium text-[#E4E4E7] transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#1A1B21] hover:text-[#F5F3FF] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                  >
+                    {label}
+                  </button>
+                ));
+              })()}
+            </div>
             <div className="mt-1 flex items-center gap-1 text-sm text-[#71717A]">
               {amount && !isNaN(Number(amount)) ? (
                 <>
@@ -513,7 +563,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                         type="button"
                         role="option"
                         aria-selected={isSelected}
-                        aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
+                        aria-label={`${option.symbol}, ${formatBalance(option.balance ?? '0')} available`}
                         onClick={() => {
                           if (canSelect) {
                             setFromToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
@@ -535,7 +585,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                             {option.symbol}
                           </span>
                           <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
-                            {option.balance ?? '0'} available
+                            {formatBalance(option.balance ?? '0')} available
                           </span>
                         </div>
                         {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
@@ -637,7 +687,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                         type="button"
                         role="option"
                         aria-selected={isSelected}
-                        aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
+                        aria-label={`${option.symbol}, ${formatBalance(option.balance ?? '0')} available`}
                         onClick={() => {
                           if (canSelect) {
                             setToToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
@@ -659,7 +709,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
                             {option.symbol}
                           </span>
                           <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
-                            {option.balance ?? '0'} available
+                            {formatBalance(option.balance ?? '0')} available
                           </span>
                         </div>
                         {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
@@ -684,9 +734,11 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
             handleSwap
           }
           disabled={
-            actionStage === 'get-quote' ? (isLoading || !amount) :
-            actionStage === 'review' ? isLoading :
-            isLoading || !quote || !amount
+            (actionStage === 'get-quote' ? (isLoading || !amount) :
+             actionStage === 'review' ? isLoading :
+             isLoading || !quote || !amount)
+            ||
+            (swapStatus === 'processing' || swapStatus === 'success')
           }
           className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
         >
@@ -698,6 +750,42 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
             'Swap'
           )}
         </button>
+
+        {/* --- Swap Status Indicator --- */}
+        {swapStatus === 'processing' && (
+          <div className="mt-4 rounded-2xl border border-amber-600/40 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-amber-400" />
+              <div className="flex-1">
+                <p className="text-sm text-amber-300 font-medium">Swapping...</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {swapStatus === 'success' && quote && (
+          <div className="mt-4 rounded-2xl border border-green-700/40 bg-green-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" />
+              <div className="flex-1">
+                <p className="text-sm text-green-300 font-medium">Swap Successful</p>
+                <p className="mt-1 text-xs text-green-400/80">
+                  Swapped {quote.inputAmount} {fromToken} → {quote.outputAmount} {toToken}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {swapStatus === 'failed' && (
+          <div className="mt-4 rounded-2xl border border-red-700/40 bg-red-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+              <div className="flex-1">
+                <p className="text-sm text-red-300 font-medium">Swap Failed</p>
+                <p className="mt-1 text-xs text-red-400/80">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* --- Quote & Exchange Rate --- */}
@@ -733,7 +821,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       )}
 
       {/* --- Error Display --- */}
-      {error && (
+      {error && swapStatus !== 'failed' && (
         <div className="mt-4 rounded-2xl border border-red-700/40 bg-red-500/10 p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
