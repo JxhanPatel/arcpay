@@ -44,7 +44,7 @@ describe('Swap Component', () => {
         tokenAssets={mockTokenAssets}
       />
     );
-    expect(screen.getByText('Swap Tokens')).toBeInTheDocument();
+    expect(screen.queryByText('Swap Tokens')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Amount')).toBeInTheDocument();
     expect(screen.getByText('Get Quote')).toBeInTheDocument();
   });
@@ -62,6 +62,24 @@ describe('Swap Component', () => {
     fireEvent.click(screen.getByText('Get Quote'));
     await waitFor(() => {
       expect(screen.getByText('Exchange Rate')).toBeInTheDocument();
+    });
+  });
+
+  it('shows all three quote rows after clicking Get Quote', async () => {
+    render(
+      <Swap
+        provider={mockProvider}
+        wallet={mockWallet}
+        assetBalances={mockAssetBalances}
+        tokenAssets={mockTokenAssets}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText('Amount'), { target: { value: '100' } });
+    fireEvent.click(screen.getByText('Get Quote'));
+    await waitFor(() => {
+      expect(screen.getByText('Network Fee (USDC)')).toBeInTheDocument();
+      expect(screen.getByText('Exchange Rate')).toBeInTheDocument();
+      expect(screen.getByText('Estimated Output')).toBeInTheDocument();
     });
   });
 
@@ -309,5 +327,175 @@ describe('Swap Component', () => {
     // Verify the component shows the error and does not attempt the swap
     expect(mockWalletNoSwap.sendTransaction).not.toHaveBeenCalled();
     expect(onSwapSuccess).not.toHaveBeenCalled();
+  });
+
+  // Dropdown (portal) tests
+  describe('Token Selector Dropdown', () => {
+    it('opens the "From" dropdown and renders all token options when clicked', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // Initially dropdown should not be visible
+      expect(screen.queryByRole('listbox', { name: 'From token options' })).not.toBeInTheDocument();
+
+      // Click the "From" button
+      fireEvent.click(screen.getByLabelText('From: USDC'));
+
+      // Dropdown should now be visible
+      const fromDropdown = screen.getByRole('listbox', { name: 'From token options' });
+      expect(fromDropdown).toBeInTheDocument();
+
+      // All token options should be rendered
+      const options = screen.getAllByRole('option');
+      expect(options.length).toBeGreaterThan(0);
+
+      // USDC, EURC, and cirBTC should all be present
+      expect(screen.getByRole('option', { name: /USDC/ })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /EURC/ })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /cirBTC/ })).toBeInTheDocument();
+    });
+
+    it('opens the "To" dropdown and renders all token options when clicked', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // Initially dropdown should not be visible
+      expect(screen.queryByRole('listbox', { name: 'To token options' })).not.toBeInTheDocument();
+
+      // Click the "To" button
+      fireEvent.click(screen.getByLabelText('To: EURC'));
+
+      // Dropdown should now be visible
+      const toDropdown = screen.getByRole('listbox', { name: 'To token options' });
+      expect(toDropdown).toBeInTheDocument();
+
+      // All token options should be rendered
+      const options = screen.getAllByRole('option');
+      expect(options.length).toBeGreaterThan(0);
+    });
+
+    it('selecting a token closes the dropdown and updates the token', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // Click "From" button to open dropdown
+      fireEvent.click(screen.getByLabelText('From: USDC'));
+      expect(screen.getByRole('listbox', { name: 'From token options' })).toBeInTheDocument();
+
+      // Click EURC option
+      fireEvent.click(screen.getByRole('option', { name: /EURC/ }));
+
+      // Dropdown should be closed
+      expect(screen.queryByRole('listbox', { name: 'From token options' })).not.toBeInTheDocument();
+
+      // From token should be updated
+      expect(screen.getByLabelText('From: EURC')).toBeInTheDocument();
+    });
+
+    it('closes the dropdown when clicking outside', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // Open the "From" dropdown
+      fireEvent.click(screen.getByLabelText('From: USDC'));
+      expect(screen.getByRole('listbox', { name: 'From token options' })).toBeInTheDocument();
+
+      // Click outside on the swap button
+      fireEvent.mouseDown(document.body);
+      expect(screen.queryByRole('listbox', { name: 'From token options' })).not.toBeInTheDocument();
+    });
+
+    it('dropdown options are rendered in the DOM (portal renders to document.body)', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // Open "From" dropdown
+      fireEvent.click(screen.getByLabelText('From: USDC'));
+
+      // Get all options - they should be in the document
+      const options = screen.getAllByRole('option');
+      expect(options.length).toBeGreaterThanOrEqual(3); // At least USDC, EURC, cirBTC
+
+      // Verify options are present in the DOM.
+      // In the "From" dropdown: USDC is the current selection (not disabled),
+      // EURC is disabled (same as "To"), cirBTC is available.
+      const usdcOption = screen.getByRole('option', { name: /USDC/ });
+      const eurcOption = screen.getByRole('option', { name: /EURC/ });
+      const cirbtcOption = screen.getByRole('option', { name: /cirBTC/ });
+
+      expect(usdcOption).not.toBeDisabled();  // USDC is the current selection, selectable
+      expect(eurcOption).toBeDisabled();      // EURC matches "To" token, disabled
+      expect(cirbtcOption).not.toBeDisabled();
+    });
+
+    it('disables options that would cause duplicate token selection', () => {
+      render(
+        <Swap
+          provider={mockProvider}
+          wallet={mockWallet}
+          assetBalances={mockAssetBalances}
+          tokenAssets={mockTokenAssets}
+        />
+      );
+
+      // "From" is USDC, "To" is EURC
+      // Clicking "From" dropdown - EURC should be disabled (same as "To")
+      fireEvent.click(screen.getByLabelText('From: USDC'));
+      
+      const fromDropdown = screen.getByRole('listbox', { name: 'From token options' });
+      expect(fromDropdown).toBeInTheDocument();
+
+      // EURC should be disabled in "From" dropdown (same as "To")
+      const eurcOption = screen.getByRole('option', { name: /EURC/ });
+      expect(eurcOption).toBeDisabled();
+
+      // USDC is the current "From" selection; it is selectable (not disabled by duplicate rule)
+      const usdcOption = screen.getByRole('option', { name: /USDC/ });
+      expect(usdcOption).not.toBeDisabled();
+
+      fireEvent.mouseDown(document.body); // close dropdown
+
+      // Now test "To" dropdown - USDC should be disabled (same as "From")
+      fireEvent.click(screen.getByLabelText('To: EURC'));
+      
+      const toDropdown = screen.getByRole('listbox', { name: 'To token options' });
+      expect(toDropdown).toBeInTheDocument();
+
+      const toUsdcOption = screen.getByRole('option', { name: /USDC/ });
+      expect(toUsdcOption).toBeDisabled();
+
+      const toEurcOption = screen.getByRole('option', { name: /EURC/ });
+      expect(toEurcOption).toBeDisabled();
+    });
   });
 });

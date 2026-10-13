@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUpDown, ChevronDown, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { ethers } from 'ethers';
 import { getSwapQuote, buildSwapTransactionPlan, buildTokenApprovalPlan, validateSwapAmount, getTokenAddress, UNISWAP_V3_ROUTER_ABI, UNISWAP_V3_ROUTER_ADDRESS, DEFAULT_SLIPPAGE_TOLERANCE, SWAP_DEADLINE_SECONDS } from '../swap';
+import { formatGasFeeUsdc } from '../gasEstimate';
 import { getAssetUsdPrice, getAssetUsdValue, formatTokenBalance, getAssetDecimals } from '../balance';
 import usdcSvg from '../assets/usdc.svg';
 import eurcSvg from '../assets/eurc.svg';
@@ -30,16 +32,81 @@ type SwapProps = {
 };
 
 export default function Swap({ provider, wallet, assetBalances, tokenAssets, onSwapSuccess }: SwapProps) {
+  type ActionStage = 'get-quote' | 'review' | 'swap';
+
   const [fromToken, setFromToken] = useState('USDC');
   const [toToken, setToToken] = useState('EURC');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [actionStage, setActionStage] = useState<ActionStage>('get-quote');
   const [quote, setQuote] = useState<{ inputAmount: string; outputAmount: string; rate: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<'from' | 'to' | null>(null);
+  
+  // Gas fee estimation states
+  const [gasFeeUsdc, setGasFeeUsdc] = useState<string | null>(null);
+  const [isEstimatingGasFee, setIsEstimatingGasFee] = useState(false);
+  const [gasFeeError, setGasFeeError] = useState<string | null>(null);
+
+  // State to store dropdown positions for portal rendering
+  const [dropdownPositions, setDropdownPositions] = useState<Record<'from' | 'to', { x: number; y: number; width: number } | null>>({
+    from: null,
+    to: null
+  });
 
   const fromDropdownRef = useRef<HTMLDivElement>(null);
   const toDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Update dropdown positions when refs change or open state changes
+  useEffect(() => {
+    const updatePosition = (type: 'from' | 'to') => {
+      const ref = type === 'from' ? fromDropdownRef : toDropdownRef;
+      if (ref.current && openDropdown === type) {
+        const rect = ref.current.getBoundingClientRect();
+        setDropdownPositions(prev => ({
+          ...prev,
+          [type]: { x: rect.left, y: rect.bottom, width: rect.width }
+        }));
+      } else if (openDropdown !== type) {
+        // Clear position when dropdown is closed
+        setDropdownPositions(prev => ({
+          ...prev,
+          [type]: null
+        }));
+      }
+    };
+
+    // Always update both positions when openDropdown changes
+    updatePosition('from');
+    updatePosition('to');
+  }, [openDropdown, fromDropdownRef, toDropdownRef]);
+
+  // Update positions on window resize or scroll
+  useEffect(() => {
+    const handleResize = () => {
+      if (openDropdown === 'from' && fromDropdownRef.current) {
+        const rect = fromDropdownRef.current.getBoundingClientRect();
+        setDropdownPositions(prev => ({
+          ...prev,
+          from: { x: rect.left, y: rect.bottom, width: rect.width }
+        }));
+      }
+      if (openDropdown === 'to' && toDropdownRef.current) {
+        const rect = toDropdownRef.current.getBoundingClientRect();
+        setDropdownPositions(prev => ({
+          ...prev,
+          to: { x: rect.left, y: rect.bottom, width: rect.width }
+        }));
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize);
+    };
+  }, [openDropdown]);
 
   // Combine all assets for dropdown display, deduplicating by symbol
   const seen = new Set<string>();
@@ -82,10 +149,18 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (openDropdown === 'from' && fromDropdownRef.current && !fromDropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      // If the click is inside a dropdown option (rendered via portal), do not close.
+      // The option's own onClick will handle selection and closing.
+      if (target.closest?.('[role="listbox"]')) {
+        return;
+      }
+
+      if (openDropdown === 'from' && fromDropdownRef.current && !fromDropdownRef.current.contains(target)) {
         setOpenDropdown(null);
       }
-      if (openDropdown === 'to' && toDropdownRef.current && !toDropdownRef.current.contains(event.target as Node)) {
+      if (openDropdown === 'to' && toDropdownRef.current && !toDropdownRef.current.contains(target)) {
         setOpenDropdown(null);
       }
     };
@@ -93,6 +168,24 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openDropdown]);
+
+  // Auto-transition to swap stage after quote is obtained (review stage)
+  useEffect(() => {
+    if (actionStage === 'review' && quote && !isLoading) {
+      const timer = setTimeout(() => setActionStage('swap'), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [actionStage, quote, isLoading]);
+
+  // Estimate gas fee when quote or tokens change
+  useEffect(() => {
+    if (quote && amount && wallet?.address) {
+      estimateGasFee();
+    } else {
+      setGasFeeUsdc(null);
+      setGasFeeError(null);
+    }
+  }, [quote, amount, fromToken, toToken]);
 
   // Prevent selecting the same token for both from and to
   const canSelectFrom = (token: string) => token !== toToken;
@@ -118,10 +211,88 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       validateSwapAmount(amount, fromToken, getTokenBalance(fromToken));
       const result = await getSwapQuote(fromToken, toToken, amount);
       setQuote({ inputAmount: result.inputAmount, outputAmount: result.outputAmount, rate: result.rate });
+      setActionStage('review'); // Transition to review stage after getting quote
     } catch (e: any) {
       setError(e.message || 'Invalid swap amount');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleReviewSwap = () => {
+    // In progressive flow: clicking Review Swap executes the swap directly
+    // (combines the review and execution steps for backward compatibility)
+    handleSwap();
+  };
+
+  const estimateGasFee = async () => {
+    if (!quote || !amount) return;
+    
+    setIsEstimatingGasFee(true);
+    setGasFeeError(null);
+    
+    try {
+      // Build the swap transaction plan to get the router address
+      const plan = buildSwapTransactionPlan(quote, wallet.address || '0x');
+      
+      // Build the swap calldata using the router interface
+      const routerInterface = new ethers.Interface(UNISWAP_V3_ROUTER_ABI);
+      const fromTokenAddress = getTokenAddress(fromToken);
+      const toTokenAddress = getTokenAddress(toToken);
+      const path = [fromTokenAddress, toTokenAddress];
+      
+      const inputAmount = ethers.parseUnits(quote.inputAmount, getAssetDecimals(fromToken));
+      const amountOutMinimum = ethers.parseUnits(quote.outputAmount, getAssetDecimals(toToken));
+      const deadline = quote.deadline || (Math.floor(Date.now() / 1000) + SWAP_DEADLINE_SECONDS);
+      
+      const calldata = routerInterface.encodeFunctionData('swapExactTokensForTokens', [
+        inputAmount,
+        amountOutMinimum,
+        path,
+        wallet.address || '0x',
+        deadline,
+      ]);
+      
+      // Estimate gas limit for the swap transaction
+      let gasLimit: bigint;
+      try {
+        gasLimit = await provider.estimateGas({
+          from: wallet.address || '0x',
+          to: plan.router,
+          data: calldata,
+        });
+      } catch (err) {
+        setGasFeeError('Unable to estimate gas');
+        return;
+      }
+      
+      // Fetch gas price
+      let gasPrice: bigint | null = null;
+      try {
+        const feeData = await provider.getFeeData();
+        gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas;
+        
+        if (!gasPrice) {
+          setGasFeeError('Unable to retrieve gas price');
+          return;
+        }
+      } catch (err) {
+        setGasFeeError('Unable to retrieve gas price');
+        return;
+      }
+      
+      // Calculate and format the gas fee
+      try {
+        const formattedFee = formatGasFeeUsdc(gasLimit, gasPrice);
+        setGasFeeUsdc(formattedFee);
+      } catch (err) {
+        setGasFeeError('Unable to calculate gas fee');
+      }
+      
+    } catch (err) {
+      setGasFeeError(err instanceof Error ? err.message : 'Gas estimation failed');
+    } finally {
+      setIsEstimatingGasFee(false);
     }
   };
 
@@ -133,6 +304,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     // Clear any existing quote and error states
     setQuote(null);
     setError(null);
+    setActionStage('get-quote'); // Reset to initial stage
   };
 
   const handleSwap = async () => {
@@ -235,8 +407,6 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
 
   return (
     <div className="swap-modal">
-      <h2 className="text-xl font-semibold text-[#F5F3FF] mb-4">Swap Tokens</h2>
-
       {/* --- Send Card --- */}
       <div className="send-card mb-4 rounded-2xl border border-white/[0.06] bg-[#0B0C11] p-4">
         <span className="text-xs font-medium text-[#71717A] mb-3 block">Send</span>
@@ -287,52 +457,63 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
               <ChevronDown className="h-3 w-3 text-[#069494] opacity-70" />
             </button>
 
+            {/* Dropdown rendered via portal to avoid clipping */}
             {openDropdown === 'from' && (
-              <div
-                role="listbox"
-                aria-label="From token options"
-                className="absolute z-50 mt-1 w-full max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
-              >
-                {assetOptions.map((option) => {
-                  const isSelected = isFromSelected(option.symbol);
-                  const isZero = Number(option.balance ?? 0) <= 0;
-                  const canSelect = canSelectFrom(option.symbol);
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
-                      onClick={() => {
-                        if (canSelect) {
-                          setFromToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
-                          setOpenDropdown(null);
-                        }
-                      }}
-                      disabled={!canSelect}
-                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                        isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
-                      } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <img
-                        src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
-                        alt=""
-                        className="h-8 w-8 rounded-full shadow-sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
-                          {option.symbol}
-                        </span>
-                        <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
-                          {option.balance ?? '0'} available
-                        </span>
-                      </div>
-                      {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
-                    </button>
-                  );
-                })}
-              </div>
+              createPortal(
+                <div
+                  role="listbox"
+                  aria-label="From token options"
+                  style={{
+                    position: 'fixed',
+                    zIndex: 50,
+                    left: dropdownPositions.from?.x ?? 0,
+                    top: dropdownPositions.from?.y ?? 0,
+                    width: dropdownPositions.from?.width ?? 0,
+                  }}
+                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
+                >
+                  {assetOptions.map((option) => {
+                    const isSelected = isFromSelected(option.symbol);
+                    const isZero = Number(option.balance ?? 0) <= 0;
+                    const canSelect = canSelectFrom(option.symbol);
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
+                        onClick={() => {
+                          if (canSelect) {
+                            setFromToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
+                            setOpenDropdown(null);
+                          }
+                        }}
+                        disabled={!canSelect}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
+                          isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
+                        } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        <img
+                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
+                          alt=""
+                          className="h-8 w-8 rounded-full shadow-sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
+                            {option.symbol}
+                          </span>
+                          <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
+                            {option.balance ?? '0'} available
+                          </span>
+                        </div>
+                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
+                      </button>
+                    );
+                  })}
+                </div>,
+                document.body
+              )
             )}
           </div>
         </div>
@@ -399,99 +580,119 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
               <ChevronDown className="h-3 w-3 text-[#069494] opacity-70" />
             </button>
 
+            {/* Dropdown rendered via portal to avoid clipping */}
             {openDropdown === 'to' && (
-              <div
-                role="listbox"
-                aria-label="To token options"
-                className="absolute z-50 mt-1 w-full max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
-              >
-                {assetOptions.map((option) => {
-                  const isSelected = isToSelected(option.symbol);
-                  const isZero = Number(option.balance ?? 0) <= 0;
-                  const canSelect = canSelectTo(option.symbol);
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
-                      onClick={() => {
-                        if (canSelect) {
-                          setToToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
-                          setOpenDropdown(null);
-                        }
-                      }}
-                      disabled={!canSelect}
-                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                        isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
-                      } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <img
-                        src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
-                        alt=""
-                        className="h-8 w-8 rounded-full shadow-sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
-                          {option.symbol}
-                        </span>
-                        <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
-                          {option.balance ?? '0'} available
-                        </span>
-                      </div>
-                      {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
-                    </button>
-                  );
-                })}
-              </div>
+              createPortal(
+                <div
+                  role="listbox"
+                  aria-label="To token options"
+                  style={{
+                    position: 'fixed',
+                    zIndex: 50,
+                    left: dropdownPositions.to?.x ?? 0,
+                    top: dropdownPositions.to?.y ?? 0,
+                    width: dropdownPositions.to?.width ?? 0,
+                  }}
+                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
+                >
+                  {assetOptions.map((option) => {
+                    const isSelected = isToSelected(option.symbol);
+                    const isZero = Number(option.balance ?? 0) <= 0;
+                    const canSelect = canSelectTo(option.symbol);
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        aria-label={`${option.symbol}, ${option.balance ?? '0'} available`}
+                        onClick={() => {
+                          if (canSelect) {
+                            setToToken(option.symbol as 'USDC' | 'EURC' | 'cirBTC');
+                            setOpenDropdown(null);
+                          }
+                        }}
+                        disabled={!canSelect}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
+                          isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
+                        } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        <img
+                          src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol] ?? ASSET_ICON_URLS.CIRBTC}
+                          alt=""
+                          className="h-8 w-8 rounded-full shadow-sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
+                            {option.symbol}
+                          </span>
+                          <span className={`block text-[11px] font-variant-numeric-tabular ${isZero ? 'text-[#555]' : 'text-[#71717A]'}`}>
+                            {option.balance ?? '0'} available
+                          </span>
+                        </div>
+                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
+                      </button>
+                    );
+                  })}
+                </div>,
+                document.body
+              )
             )}
           </div>
         </div>
       </div>
 
-      {/* --- Get Quote --- */}
+      {/* --- Progressive Action Button --- */}
       <div className="mb-4">
+        {/* Single Progressive Action Button */}
         <button
-          onClick={handleGetQuote}
-          disabled={isLoading || !amount}
+          onClick={
+            actionStage === 'get-quote' ? handleGetQuote :
+            actionStage === 'review' ? handleReviewSwap :
+            handleSwap
+          }
+          disabled={
+            actionStage === 'get-quote' ? (isLoading || !amount) :
+            actionStage === 'review' ? isLoading :
+            isLoading || !quote || !amount
+          }
           className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {isLoading ? <Loader2 className="h-4 w-4 inline mr-2 animate-spin" /> : 'Get Quote'}
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+          ) : (
+            actionStage === 'get-quote' ? 'Get Quote' :
+            actionStage === 'review' ? 'Review Swap' :
+            'Swap'
+          )}
         </button>
       </div>
 
       {/* --- Quote & Exchange Rate --- */}
       {quote && (
-        <>
-          <div className="mb-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[#71717A]">Exchange Rate</span>
-              <span className="font-medium text-[#F5F3FF]">1 {fromToken} ≈ {quote.rate} {toToken}</span>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
-              <span className="text-[#71717A]">Estimated Output</span>
-              <div className="text-right">
-                <span className="font-medium text-[#F5F3FF]">{quote.outputAmount} {toToken}</span>
-                <span className="ml-2 text-xs text-[#71717A]">{(() => {
-                  const usdValue = getAssetUsdValue(toToken, quote.outputAmount);
-                  if (usdValue === null || !Number.isFinite(usdValue)) return '≈ $--';
-                  return `≈ $${usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                })()}</span>
-              </div>
+        <div className="mb-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-[#71717A]">Network Fee (USDC)</span>
+            <span className="font-medium text-[#F5F3FF]">
+              {isEstimatingGasFee ? 'Estimating...' : gasFeeError ? 'Unable to estimate' : gasFeeUsdc}
+            </span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
+            <span className="text-[#71717A]">Exchange Rate</span>
+            <span className="font-medium text-[#F5F3FF]">1 {fromToken} ≈ {quote.rate} {toToken}</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
+            <span className="text-[#71717A]">Estimated Output</span>
+            <div className="text-right">
+              <span className="font-medium text-[#F5F3FF]">{quote.outputAmount} {toToken}</span>
+              <span className="ml-2 text-xs text-[#71717A]">{(() => {
+                const usdValue = getAssetUsdValue(toToken, quote.outputAmount);
+                if (usdValue === null || !Number.isFinite(usdValue)) return '≈ $--';
+                return `≈ $${usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              })()}</span>
             </div>
           </div>
-
-          {/* Swap Execution Button */}
-          <button
-            type="button"
-            onClick={handleSwap}
-            disabled={isLoading || !quote || !amount}
-            className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 inline mr-2 animate-spin" /> : 'Swap'}
-          </button>
-        </>
+        </div>
       )}
 
       {/* --- Error Display --- */}
