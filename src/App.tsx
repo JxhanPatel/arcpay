@@ -95,6 +95,7 @@ import {
   setSessionSeed,
   type AccountMeta,
 } from './accounts';
+import Swap from './components/Swap';
 
 const ARC_RPC_URL = 'https://rpc.testnet.arc.network';
 const ARC_CHAIN_ID = 5042002;
@@ -740,7 +741,7 @@ const PasscodePad = ({
             type="button"
             onClick={() => onComplete(pin)}
             disabled={pin.length < 4}
-            className="press-effect rounded-[14px] bg-[#069494] py-3 text-sm font-medium text-white transition-normal hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-50"
+            className="press-effect rounded-[14px] bg-[#069494] py-3 text-lg font-medium text-white transition-normal hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>
@@ -886,6 +887,7 @@ function App() {
   const [showScanner, setShowScanner] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSwap, setShowSwap] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [confirmRemoval, setConfirmRemoval] = useState(false);
@@ -2502,6 +2504,15 @@ function App() {
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Request</span>
           </button>
           <button
+            onClick={() => setShowSwap(true)}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
+              <RefreshCcw className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Swap</span>
+          </button>
+          <button
             onClick={() => setShowHistory(true)}
             className="group flex flex-col items-center gap-2"
           >
@@ -3720,6 +3731,25 @@ function App() {
           </div>
         </div>
       ) : null}
+      {showSwap ? (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-semibold">Swap</h3>
+              <button onClick={() => setShowSwap(false)} className="text-sm text-[#A1A1AA]">Close</button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <Swap
+                provider={provider}
+                wallet={wallet}
+                assetBalances={assetBalances}
+                tokenAssets={tokenAssets}
+                onSwapSuccess={() => setShowSwap(false)}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-10 border-t border-white/[0.06] bg-[#08090D]/95 backdrop-blur-xl">
@@ -3743,6 +3773,7 @@ function App() {
             {/* Subtle pulse ring on hover */}
             <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#069494]/30 transition-normal group-hover:ring-[#069494]/50" />
           </button>
+
 
           {/* Right: Settings */}
           <button
