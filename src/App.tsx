@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import {
   AlertTriangle,
   ArrowDownLeft,
+  ArrowUpDown,
   ArrowUpRight,
   CheckCircle2,
   ChevronRight,
@@ -373,10 +374,7 @@ export type TransactionHistoryItem = {
   decimals: number;
   timestamp: number;
   direction: 'sent' | 'received';
-  // 'confirming' is an additive, client-side-only state for freshly submitted
-  // sends that have a hash but no on-chain receipt yet. It is distinct from
-  // 'pending', which remains the bucket for genuinely unconfirmed/unknown
-  // statuses coming back from the explorer.
+  type?: 'swap' | 'transfer';
   status: 'ok' | 'pending' | 'error' | 'confirming';
 };
 
@@ -561,6 +559,7 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
       }
 
       const direction = parseTransactionDirection(normalizedAddress, txFrom, txTo);
+      const isSwap = hasTokenTransferType && tokenTransfers.length > 0;
 
       return {
         hash,
@@ -571,6 +570,7 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
         decimals: displayMeta.decimals,
         timestamp: Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now(),
         direction,
+        type: isSwap ? 'swap' : 'transfer',
         status,
       } satisfies TransactionHistoryItem;
     }),
@@ -2508,7 +2508,7 @@ function App() {
             className="group flex flex-col items-center gap-2"
           >
             <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <RefreshCcw className="h-[18px] w-[18px]" />
+              <ArrowUpDown className="h-[18px] w-[18px]" />
             </span>
             <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Swap</span>
           </button>
@@ -2684,9 +2684,7 @@ function App() {
                     return (
                       <div 
                         key={transaction.hash} 
-                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${
-                          transaction.status === 'error' ? 'opacity-50' : ''
-                        }`}
+                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-purple-500/5 border-purple-500/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -2696,11 +2694,10 @@ function App() {
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
                               <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
-                              <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
                             </div>
                           </div>
                           <div className="text-right pl-2">
-                            <p className={`font-semibold ${transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                            <p className={`font-semibold ${isSwap ? 'text-purple-400' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
                               {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
                             </p>
                             <span className={`inline-block text-xs mt-1 ${
@@ -2785,7 +2782,10 @@ function App() {
                     const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
-                    const directionIcon = transaction.direction === 'received' ? (
+                    const isSwap = transaction.type === 'swap';
+                    const directionIcon = isSwap ? (
+                      <ArrowUpDown className="h-4 w-4 text-purple-400" />
+                    ) : transaction.direction === 'received' ? (
                       <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
                     ) : (
                       <ArrowUpRight className="h-4 w-4 text-rose-500/70" />
@@ -2794,9 +2794,7 @@ function App() {
                     return (
                       <div 
                         key={transaction.hash} 
-                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${
-                          transaction.status === 'error' ? 'opacity-50' : ''
-                        }`}
+                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-purple-500/5 border-purple-500/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -2806,11 +2804,12 @@ function App() {
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
                               <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
+                               {isSwap ? <p className="inline-block text-xs mt-1 ml-2 bg-purple-500/10 text-purple-300 rounded border-purple-500/20 px-1.5 py-0.5">Swap</p> : null}
                               <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
                             </div>
                           </div>
                           <div className="text-right pl-2">
-                            <p className={`font-semibold ${transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                            <p className={`font-semibold ${isSwap ? 'text-purple-400' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
                               {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
                             </p>
                             <span className={`inline-block text-xs mt-1 ${

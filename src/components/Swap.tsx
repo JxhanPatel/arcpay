@@ -449,7 +449,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       });
       await tx.wait();
 
-      onSwapSuccess();
+      // onSwapSuccess(); // called on Done button click only
       setSwapStatus('success');
     } catch (e: any) {
       setError(e.message || 'Swap failed');
@@ -763,17 +763,25 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
           </div>
         )}
         {swapStatus === 'success' && quote && (
-          <div className="mt-4 rounded-2xl border border-green-700/40 bg-green-500/10 p-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" />
-              <div className="flex-1">
-                <p className="text-sm text-green-300 font-medium">Swap Successful</p>
-                <p className="mt-1 text-xs text-green-400/80">
-                  Swapped {quote.inputAmount} {fromToken} → {quote.outputAmount} {toToken}
-                </p>
+          <>
+            <div className="mt-4 rounded-2xl border border-green-700/40 bg-green-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" />
+                <div className="flex-1">
+                  <p className="text-sm text-green-300 font-medium">Swap Successful</p>
+                  <p className="mt-1 text-xs text-green-400/80">
+                    Swapped {quote.inputAmount} {fromToken} → {quote.outputAmount} {toToken}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+            <button 
+              onClick={() => onSwapSuccess?.()}
+              className="mt-4 w-full rounded-xl bg-[#069494] px-4 py-2 font-medium text-white hover:bg-[#058A8A]"
+            >
+              Done
+            </button>
+          </>
         )}
         {swapStatus === 'failed' && (
           <div className="mt-4 rounded-2xl border border-red-700/40 bg-red-500/10 p-4">
