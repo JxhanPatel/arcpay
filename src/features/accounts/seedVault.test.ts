@@ -23,7 +23,7 @@ import {
   getSeedVaultFromStorage,
   hasSeedVault,
   parseVaultPayload,
-} from './utils/pinVault';
+} from '../../lib/pinVault';
 
 // The keystore encryption (ethers scrypt) is slow and irrelevant to these
 // assertions, so it is mocked at the ethers.js layer. Nothing here touches the

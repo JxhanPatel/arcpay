@@ -5,7 +5,7 @@ import {
   parseVaultPayload,
   serializeVaultPayload,
   type EncryptedVaultPayload,
-} from './utils/pinVault';
+} from '../../lib/pinVault';
 
 // Deterministic test inputs — no network, no RPC, no shared state.
 const PIN = '1234';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ethers } from 'ethers';
-import { resolveArcName } from './utils/arcName';
+import { resolveArcName } from '../../lib/arcName';
 
 describe('resolveArcName', () => {
   const provider = new ethers.JsonRpcProvider('https://rpc.testnet.arc.network');

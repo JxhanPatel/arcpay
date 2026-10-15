@@ -6,7 +6,7 @@ import {
   mergeFetchedTransactions,
   reconcileOptimisticTransaction,
   type TransactionHistoryItem,
-} from './App';
+} from '../../App';
 
 const SENDER = '0x1111111111111111111111111111111111111111';
 const RECIPIENT = '0x2222222222222222222222222222222222222222';

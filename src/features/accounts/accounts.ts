@@ -7,8 +7,8 @@ import {
   removeSeedVaultFromStorage,
   serializeVaultPayload,
   setSeedVaultInStorage,
-} from './utils/pinVault';
-import { encryptWallet } from './utils/walletStorage';
+} from '../../lib/pinVault';
+import { encryptWallet } from '../../lib/walletStorage';
 
 export type AccountMeta = {
   index: number;

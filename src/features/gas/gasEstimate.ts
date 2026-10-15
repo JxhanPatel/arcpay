@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { formatTokenBalance } from './balance';
+import { formatTokenBalance } from '../balance/balance';
 
 const GAS_FEE_DECIMALS = 18;
 

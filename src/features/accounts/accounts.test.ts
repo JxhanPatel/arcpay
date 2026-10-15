@@ -18,7 +18,7 @@ import {
   setActiveAccountIndex,
   setKeystoreForAccount,
 } from './accounts';
-import * as walletStorage from './utils/walletStorage';
+import * as walletStorage from '../../lib/walletStorage';
 
 const TEST_MNEMONIC = 'test test test test test test test test test test test junk';
 

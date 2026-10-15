@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUpDown, ChevronDown, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { ethers } from 'ethers';
-import { getSwapQuote, buildSwapTransactionPlan, buildTokenApprovalPlan, validateSwapAmount, getTokenAddress, UNISWAP_V3_ROUTER_ABI, UNISWAP_V3_ROUTER_ADDRESS, DEFAULT_SLIPPAGE_TOLERANCE, SWAP_DEADLINE_SECONDS } from '../swap';
-import { formatGasFeeUsdc } from '../gasEstimate';
-import { getAssetUsdPrice, getAssetUsdValue, formatTokenBalance, getAssetDecimals } from '../balance';
+import { getSwapQuote, buildSwapTransactionPlan, buildTokenApprovalPlan, validateSwapAmount, getTokenAddress, UNISWAP_V3_ROUTER_ABI, UNISWAP_V3_ROUTER_ADDRESS, DEFAULT_SLIPPAGE_TOLERANCE, SWAP_DEADLINE_SECONDS } from '../features/swap/swap';
+import { formatGasFeeUsdc } from '../features/gas/gasEstimate';
+import { getAssetUsdPrice, getAssetUsdValue, formatTokenBalance, getAssetDecimals } from '../features/balance/balance';
 import usdcSvg from '../assets/usdc.svg';
 import eurcSvg from '../assets/eurc.svg';
 
@@ -29,7 +29,7 @@ type SwapProps = {
   onSwapSuccess?: () => void;
 };
 
-export default function Swap({ provider, wallet, assetBalances, tokenAssets, onSwapSuccess }: SwapProps) {
+export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenAssets, onSwapSuccess }: SwapProps) {
   type ActionStage = 'get-quote' | 'review' | 'swap';
 
   type SwapStatus = 'idle' | 'processing' | 'success' | 'failed';
@@ -39,7 +39,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [actionStage, setActionStage] = useState<ActionStage>('get-quote');
-  const [quote, setQuote] = useState<{ inputAmount: string; outputAmount: string; rate: string } | null>(null);
+  const [quote, setQuote] = useState<{ from: string; inputAmount: string; outputAmount: string; rate: string; deadline?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<'from' | 'to' | null>(null);
   const [swapStatus, setSwapStatus] = useState<SwapStatus>('idle');
@@ -177,7 +177,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target as Element;
 
       // If the click is inside a dropdown option (rendered via portal), do not close.
       // The option's own onClick will handle selection and closing.
@@ -250,7 +250,7 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
     try {
       validateSwapAmount(amount, fromToken, getTokenBalance(fromToken));
       const result = await getSwapQuote(fromToken, toToken, amount);
-      setQuote({ inputAmount: result.inputAmount, outputAmount: result.outputAmount, rate: result.rate });
+      setQuote({ from: fromToken, inputAmount: result.inputAmount, outputAmount: result.outputAmount, rate: result.rate });
       setActionStage('review'); // Transition to review stage after getting quote
     } catch (e: any) {
       setError(e.message || 'Invalid swap amount');
@@ -842,4 +842,4 @@ export default function Swap({ provider, wallet, assetBalances, tokenAssets, onS
       )}
     </div>
   );
-}
+});

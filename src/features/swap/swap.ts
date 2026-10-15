@@ -6,7 +6,7 @@
  */
 
 import { ethers } from 'ethers';
-import { formatTokenBalance, getAssetDecimals } from './balance';
+import { formatTokenBalance, getAssetDecimals } from '../balance/balance';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -257,6 +257,7 @@ export async function getSwapQuote(
   const rate = (Number(outputAmount) / value).toString();
 
   return {
+    from: fromToken,
     inputAmount: trimmedAmount,
     outputAmount,
     rate,

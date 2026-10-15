@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import {
   AlertTriangle,
@@ -45,8 +45,8 @@ import {
   parseNativeBalance,
   parseTokenBalances,
   parseTransactionDirection,
-} from './balance';
-import { buildFeeSummary, formatGasFeeUsdc } from './gasEstimate';
+} from './features/balance/balance';
+import { buildFeeSummary, formatGasFeeUsdc } from './features/gas/gasEstimate';
 import {
   type Contact,
   formatContactLabel,
@@ -54,8 +54,8 @@ import {
   removeContact,
   saveContact,
   filterContacts,
-} from './contacts';
-import { resolveArcName } from './utils/arcName';
+} from './features/contacts/contacts';
+import { resolveArcName } from './lib/arcName';
 import {
   decryptPrivateKey,
   encryptPrivateKey,
@@ -65,7 +65,7 @@ import {
   removeVaultFromStorage,
   serializeVaultPayload,
   setVaultInStorage,
-} from './utils/pinVault';
+} from './lib/pinVault';
 import {
   decryptWallet,
   encryptWallet,
@@ -74,7 +74,7 @@ import {
   removeKeystoreFromStorage,
   setKeystoreInStorage,
   STORAGE_KEY_LEGACY,
-} from './utils/walletStorage';
+} from './lib/walletStorage';
 import {
   ADD_ACCOUNT_UNAVAILABLE_MESSAGES,
   addDerivedAccount,
@@ -95,8 +95,8 @@ import {
   setKeystoreForAccount,
   setSessionSeed,
   type AccountMeta,
-} from './accounts';
-import Swap from './components/Swap';
+} from './features/accounts/accounts';
+import { Swap } from './components/Swap';
 
 const ARC_RPC_URL = 'https://rpc.testnet.arc.network';
 const ARC_CHAIN_ID = 5042002;
@@ -638,7 +638,7 @@ const parseWalletInput = (input: string): ArcWallet => {
 };
 
 // Numeric passcode pad used for unlock / create / confirm screens.
-const PasscodePad = ({
+const PasscodePad = memo(({
   mode,
   error,
   onComplete,
@@ -749,7 +749,7 @@ const PasscodePad = ({
       </div>
     </div>
   );
-};
+});
 
 type AppScreenState = 'setup' | 'unlock' | 'create-passcode' | 'confirm-passcode' | 'dashboard';
 
@@ -770,7 +770,7 @@ type AssetSelectorProps = {
 
 // AssetSelector — accessible, custom-styled dropdown that shows the selected
 // asset icon + symbol + balance and lists all options with zero-balance dimming.
-const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProps) => {
+const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelectorProps) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = assets.find((asset) => asset.key === value) ?? assets[0] ?? null;
@@ -872,7 +872,7 @@ const AssetSelector = ({ id, label, assets, value, onChange }: AssetSelectorProp
       )}
     </div>
   );
-};
+});
 
 function App() {
   const [privateKey, setPrivateKey] = useState<string | null>(null);
@@ -2672,6 +2672,7 @@ function App() {
                   ) : null}
 
                   {assetTransactions.map((transaction) => {
+                    const isSwap = transaction.type === 'swap';
                     const counterparty = transaction.direction === 'sent' ? transaction.to : transaction.from;
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;

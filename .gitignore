@@ -1,29 +1,36 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
 # Build output
 /dist/
 /dist-ssr/
+/build/
 *.js.map
 *.css.map
 
-# Vite / TypeScript
+# Vite / TypeScript / Vitest
 /.vite/
 .cache/
 .parcel-cache/
 .nyc_output/
 *.tsbuildinfo
+vitest.d.ts
 
 # Environment files
 .env
 .env.*
 !.env.example
+!.env.template
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
+*.log
 
 # Editor / OS
 .vscode/
@@ -36,10 +43,34 @@ Thumbs.db
 
 # Test coverage
 coverage/
+.nyc_output/
 
 # Temporary files
 *.tmp
 *.temp
 litellm.log
-.agents/
-skills-lock.json
+
+# TypeScript / TSNode
+*.tsbuildinfo
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Turbo / Build cache
+.turbo/
+.turborepo/
+
+# OS-specific
+*.lnk
+
+# Misc
+.svelte-kit/
+.eslintcache
+.stylelintcache
+.prettierrc
+
+# Generated files
+*.generated.ts
+*.generated.js

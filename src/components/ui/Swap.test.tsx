@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Swap from '../../components/Swap';
-import { getSwapQuote } from '../../swap';
+import { getSwapQuote } from '../../features/swap/swap';
 
 // Mock getSwapQuote to return a fixed quote for testing
 vi.mock('../../swap', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual,
+    ...actual as Record<string, unknown>,
     getSwapQuote: vi.fn().mockResolvedValue({
+      from: 'USDC',
       inputAmount: '100',
       outputAmount: '9.9',
       rate: '0.099',
@@ -27,8 +28,8 @@ describe('Swap Component', () => {
     { key: 'eurc', symbol: 'EURC', balance: '500', decimals: 6 },
   ];
   const mockTokenAssets = [
-    { key: 'eurc', symbol: 'EURC' },
-    { key: 'cirbtc', symbol: 'cirBTC' },
+    { key: 'eurc', symbol: 'EURC', balance: '500', decimals: 6 },
+    { key: 'cirbtc', symbol: 'cirBTC', balance: '0', decimals: 18 },
   ];
 
   afterEach(() => {
@@ -304,7 +305,7 @@ describe('Swap Component', () => {
     
     // Mock getSwapQuote to return a quote that would produce amountOutMinimum <= 0n
     // Reset the mock to reject first, then use it
-    getSwapQuote.mockRejectedValueOnce(
+    (getSwapQuote as any).mockRejectedValueOnce(
       new Error('Unable to determine a positive swap output; check pool liquidity.')
     );
 
