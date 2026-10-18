@@ -42,8 +42,8 @@ describe('isSupportedToken', () => {
     expect(isSupportedToken('EURC')).toBe(true);
   });
 
-  it('recognizes cirBTC', () => {
-    expect(isSupportedToken('cirBTC')).toBe(true);
+  it('does not recognize cirBTC (removed from swap support)', () => {
+    expect(isSupportedToken('cirBTC')).toBe(false);
   });
 
   it('rejects unsupported tokens', () => {

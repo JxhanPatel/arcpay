@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ethers } from 'ethers';
-import { buildSendTransactionPlan, ERC20_TRANSFER_ABI } from './App';
+import { buildSendTransactionPlan, ERC20_TRANSFER_ABI } from '../../App';
 
 describe('buildSendTransactionPlan', () => {
   it('uses a native value transaction for USDC', () => {

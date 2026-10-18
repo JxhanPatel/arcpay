@@ -32,6 +32,25 @@ type SwapProps = {
 export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenAssets, onSwapSuccess }: SwapProps) {
   type ActionStage = 'get-quote' | 'review' | 'swap';
 
+  // Maps raw ethers/fetch errors to user-friendly messages. A raw
+  // "Failed to fetch" from an unreachable RPC is useless to a user —
+  // surface a clear, actionable message instead.
+  const friendlySwapError = (err: unknown): string => {
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    const lower = message.toLowerCase();
+    if (
+      lower.includes('failed to fetch') ||
+      lower.includes('network error') ||
+      lower.includes('fetch failed') ||
+      lower.includes('rpc') ||
+      lower.includes('network') ||
+      lower.includes('connection')
+    ) {
+      return 'Network error — could not reach the Arc Testnet RPC. Check your connection and try again.';
+    }
+    return message || 'Swap failed';
+  };
+
   type SwapStatus = 'idle' | 'processing' | 'success' | 'failed';
 
   const [fromToken, setFromToken] = useState('USDC');
@@ -253,7 +272,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
       setQuote({ from: fromToken, inputAmount: result.inputAmount, outputAmount: result.outputAmount, rate: result.rate });
       setActionStage('review'); // Transition to review stage after getting quote
     } catch (e: any) {
-      setError(e.message || 'Invalid swap amount');
+      setError(friendlySwapError(e));
     } finally {
       setIsLoading(false);
     }
@@ -314,7 +333,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
           setGasFeeWarning('Gas estimation unavailable — using default estimate');
         } else {
           // Other estimation errors
-          setGasFeeError('Unable to estimate gas');
+          setGasFeeError(friendlySwapError(err) || 'Unable to estimate gas');
           return;
         }
       }
@@ -326,24 +345,24 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
         gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas;
         
         if (!gasPrice) {
-          setGasFeeError('Unable to retrieve gas price');
+          setGasFeeError(friendlySwapError(new Error('Unable to retrieve gas price')));
           return;
         }
       } catch (err) {
-        setGasFeeError('Unable to retrieve gas price');
+        setGasFeeError(friendlySwapError(err) || 'Unable to retrieve gas price');
         return;
       }
-      
+
       // Calculate and format the gas fee
       try {
         const formattedFee = formatGasFeeUsdc(gasLimit, gasPrice);
         setGasFeeUsdc(formattedFee);
       } catch (err) {
-        setGasFeeError('Unable to calculate gas fee');
+        setGasFeeError(friendlySwapError(err) || 'Unable to calculate gas fee');
       }
-      
+
     } catch (err) {
-      setGasFeeError(err instanceof Error ? err.message : 'Gas estimation failed');
+      setGasFeeError(friendlySwapError(err) || 'Gas estimation failed');
     } finally {
       setIsEstimatingGasFee(false);
     }
@@ -452,7 +471,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
       // onSwapSuccess(); // called on Done button click only
       setSwapStatus('success');
     } catch (e: any) {
-      setError(e.message || 'Swap failed');
+      setError(friendlySwapError(e));
       setSwapStatus('failed');
     } finally {
       setIsLoading(false);

@@ -98,7 +98,7 @@ import {
 } from './features/accounts/accounts';
 import { Swap } from './components/Swap';
 
-const ARC_RPC_URL = 'https://rpc.testnet.arc.network';
+const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
 const ARC_CHAIN_ID = 5042002;
 const ARC_NETWORK_NAME = 'Arc Testnet';
 const ARC_CURRENCY_SYMBOL = 'USDC';

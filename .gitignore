@@ -49,6 +49,7 @@ coverage/
 *.tmp
 *.temp
 litellm.log
+.mytmp
 
 # TypeScript / TSNode
 *.tsbuildinfo
@@ -74,3 +75,9 @@ pnpm-lock.yaml
 # Generated files
 *.generated.ts
 *.generated.js
+
+
+# AI
+.agents
+.claude
+skills-lock.json

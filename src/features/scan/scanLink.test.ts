@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseScanPayload } from './App';
+import { parseScanPayload } from '../../App';
 
 describe('parseScanPayload', () => {
   it('parses a direct pay deeplink into a send flow payload', () => {

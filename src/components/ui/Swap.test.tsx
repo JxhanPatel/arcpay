@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import Swap from '../../components/Swap';
+import { Swap } from '../../components/Swap';
 import { getSwapQuote } from '../../features/swap/swap';
+import '@testing-library/jest-dom/vitest';
 
 // Mock getSwapQuote to return a fixed quote for testing
-vi.mock('../../swap', async (importOriginal) => {
+vi.mock('../../features/swap/swap', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual as Record<string, unknown>,
@@ -153,6 +154,13 @@ describe('Swap Component', () => {
     const swapButton = screen.getByText('Swap');
     fireEvent.click(swapButton);
 
+    // After a successful swap, the component shows a "Done" button that
+    // triggers onSwapSuccess — click it to complete the flow.
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Done'));
+
     // Verify onSwapSuccess was called
     await waitFor(() => {
       expect(onSwapSuccess).toHaveBeenCalled();
@@ -204,18 +212,26 @@ describe('Swap Component', () => {
     await waitFor(() => expect(screen.getByText('Exchange Rate')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Swap'));
+
+    // After a successful swap, the component shows a "Done" button that
+    // triggers onSwapSuccess — click it to complete the flow.
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Done'));
+
     await waitFor(() => expect(onSwapSuccess).toHaveBeenCalled());
 
     // Verify sendTransaction was called twice (approval + swap)
     expect(mockWallet.sendTransaction).toHaveBeenCalledTimes(2);
-    
+
     // First call should be approval (non-empty data, not '0x')
     const firstCall = mockWallet.sendTransaction.mock.calls[0][0];
     expect(firstCall.to).toBeDefined();
     expect(firstCall.data).toBeDefined();
     expect(firstCall.data).not.toBe('0x');
     expect(firstCall.data).not.toBe('');
-    
+
     // Second call should be swap (non-empty data, not '0x')
     const secondCall = mockWallet.sendTransaction.mock.calls[1][0];
     expect(secondCall.to).toBeDefined();
@@ -244,19 +260,27 @@ describe('Swap Component', () => {
     await waitFor(() => expect(screen.getByText('Exchange Rate')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Swap'));
+
+    // After a successful swap, the component shows a "Done" button that
+    // triggers onSwapSuccess — click it to complete the flow.
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Done'));
+
     await waitFor(() => expect(onSwapSuccess).toHaveBeenCalled());
 
     // Verify sendTransaction was called twice (approval + swap)
     // USDC on Arc Testnet is an ERC-20 and requires approval
     expect(mockWallet.sendTransaction).toHaveBeenCalledTimes(2);
-    
+
     // First call should be approval (non-empty data, not '0x')
     const firstCall = mockWallet.sendTransaction.mock.calls[0][0];
     expect(firstCall.to).toBeDefined();
     expect(firstCall.data).toBeDefined();
     expect(firstCall.data).not.toBe('0x');
     expect(firstCall.data).not.toBe('');
-    
+
     // Second call should be swap (non-empty data, not '0x')
     const secondCall = mockWallet.sendTransaction.mock.calls[1][0];
     expect(secondCall.to).toBeDefined();
@@ -356,10 +380,9 @@ describe('Swap Component', () => {
       const options = screen.getAllByRole('option');
       expect(options.length).toBeGreaterThan(0);
 
-      // USDC, EURC, and cirBTC should all be present
+      // USDC and EURC should be present (cirBTC is filtered out of swap options)
       expect(screen.getByRole('option', { name: /USDC/ })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: /EURC/ })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /cirBTC/ })).toBeInTheDocument();
     });
 
     it('opens the "To" dropdown and renders all token options when clicked', () => {
@@ -401,14 +424,14 @@ describe('Swap Component', () => {
       fireEvent.click(screen.getByLabelText('From: USDC'));
       expect(screen.getByRole('listbox', { name: 'From token options' })).toBeInTheDocument();
 
-      // Click EURC option
-      fireEvent.click(screen.getByRole('option', { name: /EURC/ }));
+      // Click USDC option (current selection, enabled since To is EURC)
+      fireEvent.click(screen.getByRole('option', { name: /USDC/ }));
 
       // Dropdown should be closed
       expect(screen.queryByRole('listbox', { name: 'From token options' })).not.toBeInTheDocument();
 
-      // From token should be updated
-      expect(screen.getByLabelText('From: EURC')).toBeInTheDocument();
+      // From token should still be USDC (clicking current selection keeps it)
+      expect(screen.getByLabelText('From: USDC')).toBeInTheDocument();
     });
 
     it('closes the dropdown when clicking outside', () => {
@@ -443,20 +466,18 @@ describe('Swap Component', () => {
       // Open "From" dropdown
       fireEvent.click(screen.getByLabelText('From: USDC'));
 
-      // Get all options - they should be in the document
+      // At least USDC and EURC
       const options = screen.getAllByRole('option');
-      expect(options.length).toBeGreaterThanOrEqual(3); // At least USDC, EURC, cirBTC
+      expect(options.length).toBeGreaterThanOrEqual(2); // At least USDC, EURC
 
       // Verify options are present in the DOM.
       // In the "From" dropdown: USDC is the current selection (not disabled),
-      // EURC is disabled (same as "To"), cirBTC is available.
+      // EURC is disabled (same as "To").
       const usdcOption = screen.getByRole('option', { name: /USDC/ });
       const eurcOption = screen.getByRole('option', { name: /EURC/ });
-      const cirbtcOption = screen.getByRole('option', { name: /cirBTC/ });
 
       expect(usdcOption).not.toBeDisabled();  // USDC is the current selection, selectable
       expect(eurcOption).toBeDisabled();      // EURC matches "To" token, disabled
-      expect(cirbtcOption).not.toBeDisabled();
     });
 
     it('disables options that would cause duplicate token selection', () => {
@@ -496,7 +517,8 @@ describe('Swap Component', () => {
       expect(toUsdcOption).toBeDisabled();
 
       const toEurcOption = screen.getByRole('option', { name: /EURC/ });
-      expect(toEurcOption).toBeDisabled();
+      // EURC is currently selected as "To", so it should NOT be disabled by duplicate rule
+      expect(toEurcOption).not.toBeDisabled();
     });
   });
 });

@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { resolveArcName } from '../../lib/arcName';
 
 describe('resolveArcName', () => {
-  const provider = new ethers.JsonRpcProvider('https://rpc.testnet.arc.network');
+  const provider = new ethers.JsonRpcProvider('https://rpc.testnet.arc.io');
 
   it('returns a valid EVM address immediately', async () => {
     const address = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';

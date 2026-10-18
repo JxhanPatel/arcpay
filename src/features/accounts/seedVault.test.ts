@@ -28,8 +28,8 @@ import {
 // The keystore encryption (ethers scrypt) is slow and irrelevant to these
 // assertions, so it is mocked at the ethers.js layer. Nothing here touches the
 // network or live testnet RPC — derivation is pure offline BIP44 math.
-vi.mock('./utils/walletStorage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./utils/walletStorage')>();
+vi.mock('../../lib/walletStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/walletStorage')>();
   return {
     ...actual,
     encryptWallet: vi.fn(

@@ -56,7 +56,7 @@ export const UNISWAP_V2_ROUTER_ADDRESS =
 export const UNISWAP_V3_ROUTER_ADDRESS = UNISWAP_V2_ROUTER_ADDRESS;
 
 /** Arc Testnet RPC URL (same as App.tsx). */
-export const ARC_RPC_URL = 'https://rpc.testnet.arc.network';
+export const ARC_RPC_URL = 'https://rpc.testnet.arc.io';
 
 /** Arc Testnet chain ID (same as App.tsx). */
 export const ARC_CHAIN_ID = 5042002;
@@ -213,13 +213,21 @@ export async function getSwapQuote(
   // Build the path array for the router (from token -> to token).
   const path = [getTokenAddress(fromToken), getTokenAddress(toToken)];
 
-  // Get current block timestamp (from provider).
+  // Get current block timestamp (from provider) for the swap deadline.
+  // Wrapped in try/catch so an unreachable RPC doesn't surface a raw
+  // "Failed to fetch" to the user — we fall back to a deadline based on
+  // the current wall-clock time instead.
   const provider = new ethers.JsonRpcProvider(ARC_RPC_URL);
-  const currentBlock = await provider.getBlock('latest');
-  if (!currentBlock) {
-    throw new Error('Failed to fetch current block from RPC.');
+  let deadline: number;
+  try {
+    const currentBlock = await provider.getBlock('latest');
+    if (!currentBlock) {
+      throw new Error('Failed to fetch current block from RPC.');
+    }
+    deadline = currentBlock.timestamp + SWAP_DEADLINE_SECONDS;
+  } catch {
+    deadline = Math.floor(Date.now() / 1000) + SWAP_DEADLINE_SECONDS;
   }
-  const deadline = currentBlock.timestamp + SWAP_DEADLINE_SECONDS;
 
   // Estimate the output using the router's getAmountsOut view function.
   let outputAmountBn: bigint;
@@ -232,7 +240,8 @@ export async function getSwapQuote(
     outputAmountBn = amounts[1]; // second element is the output amount
   } catch (error) {
     // Fallback: estimate using the app's static price oracle (getAssetUsdPrice)
-    // when the on-chain quote is unavailable (e.g. no liquidity pools in fixtures).
+    // when the on-chain quote is unavailable (e.g. no liquidity pools in fixtures,
+    // or the RPC is unreachable).
     outputAmountBn = await estimateQuoteFromPrices(
       fromToken,
       toToken,
