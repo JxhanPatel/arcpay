@@ -81,3 +81,4 @@ pnpm-lock.yaml
 .agents
 .claude
 skills-lock.json
+opencode.json

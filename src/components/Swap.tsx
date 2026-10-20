@@ -224,9 +224,9 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
     }
   }, [actionStage, quote, isLoading]);
 
-  // Auto-clear swap status indicator after 5 seconds
+  // Auto-clear failed status so the user can retry; success stays until Done is clicked.
   useEffect(() => {
-    if (swapStatus === 'success' || swapStatus === 'failed') {
+    if (swapStatus === 'failed') {
       const timer = setTimeout(() => {
         setSwapStatus('idle');
         setError(null);
@@ -745,75 +745,74 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
 
       {/* --- Progressive Action Button --- */}
       <div className="mb-4">
-        {/* Single Progressive Action Button */}
         <button
           onClick={
-            actionStage === 'get-quote' ? handleGetQuote :
-            actionStage === 'review' ? handleReviewSwap :
-            handleSwap
+            swapStatus === 'success'
+              ? () => onSwapSuccess?.()
+              : actionStage === 'get-quote'
+                ? handleGetQuote
+                : actionStage === 'review'
+                  ? handleReviewSwap
+                  : handleSwap
           }
           disabled={
+            swapStatus === 'processing' ||
             (actionStage === 'get-quote' ? (isLoading || !amount) :
              actionStage === 'review' ? isLoading :
              isLoading || !quote || !amount)
-            ||
-            (swapStatus === 'processing' || swapStatus === 'success')
           }
-          className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
+          className={`w-full rounded-2xl px-4 py-3 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${
+            swapStatus === 'processing'
+              ? 'bg-amber-500/90 hover:bg-amber-500'
+              : 'bg-[#069494] hover:bg-[#058A8A]'
+          }`}
         >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 inline mr-2 animate-spin" />
+          {swapStatus === 'processing' ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Swapping...
+            </span>
+          ) : swapStatus === 'success' ? (
+            'Done'
+          ) : isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </span>
           ) : (
             actionStage === 'get-quote' ? 'Get Quote' :
             actionStage === 'review' ? 'Review Swap' :
             'Swap'
           )}
         </button>
-
-        {/* --- Swap Status Indicator --- */}
-        {swapStatus === 'processing' && (
-          <div className="mt-4 rounded-2xl border border-amber-600/40 bg-amber-500/10 p-4">
-            <div className="flex items-center gap-3">
-              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-amber-400" />
-              <div className="flex-1">
-                <p className="text-sm text-amber-300 font-medium">Swapping...</p>
-              </div>
-            </div>
-          </div>
-        )}
-        {swapStatus === 'success' && quote && (
-          <>
-            <div className="mt-4 rounded-2xl border border-green-700/40 bg-green-500/10 p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" />
-                <div className="flex-1">
-                  <p className="text-sm text-green-300 font-medium">Swap Successful</p>
-                  <p className="mt-1 text-xs text-green-400/80">
-                    Swapped {quote.inputAmount} {fromToken} → {quote.outputAmount} {toToken}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button 
-              onClick={() => onSwapSuccess?.()}
-              className="mt-4 w-full rounded-xl bg-[#069494] px-4 py-2 font-medium text-white hover:bg-[#058A8A]"
-            >
-              Done
-            </button>
-          </>
-        )}
-        {swapStatus === 'failed' && (
-          <div className="mt-4 rounded-2xl border border-red-700/40 bg-red-500/10 p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
-              <div className="flex-1">
-                <p className="text-sm text-red-300 font-medium">Swap Failed</p>
-                <p className="mt-1 text-xs text-red-400/80">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* --- Separate Success Message --- */}
+      {swapStatus === 'success' && quote && (
+        <div className="mb-4 rounded-2xl border border-green-700/40 bg-green-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-400" />
+            <div className="flex-1">
+              <p className="text-sm text-green-300 font-medium">Swap Successful</p>
+              <p className="mt-1 text-xs text-green-400/80">
+                Swapped {quote.inputAmount} {fromToken} → {quote.outputAmount} {toToken}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Separate Failed Message --- */}
+      {swapStatus === 'failed' && (
+        <div className="mb-4 rounded-2xl border border-red-700/40 bg-red-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+            <div className="flex-1">
+              <p className="text-sm text-red-300 font-medium">Swap Failed</p>
+              <p className="mt-1 text-xs text-red-400/80">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- Quote & Exchange Rate --- */}
       {quote && (
