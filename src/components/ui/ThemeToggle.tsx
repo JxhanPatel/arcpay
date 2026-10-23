@@ -17,7 +17,7 @@ export const ThemeToggle = () => {
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       aria-pressed={isDark}
       onClick={toggleTheme}
-      className="relative flex h-11 w-11 items-center justify-center rounded-full glass press-effect focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg transition-normal"
+      className="relative flex h-11 w-11 items-center justify-center rounded-full surface-with-border press-effect focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] transition-normal"
     >
       <Sun
         className={`absolute transition-all duration-200 ${

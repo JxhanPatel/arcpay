@@ -5,75 +5,34 @@
 /* Light theme */
 :root,
 [data-theme="light"] {
-  /* Space-separated RGB channels for Tailwind opacity modifiers */
-  --bg: 247 245 251;
+  --bg: 247 244 240;
   --bg-elevated: 255 255 255;
-  --ink: 14 10 22;
-  --ink-2: 88 80 104;
-  --ink-3: 150 142 166;
-  --glass-fill: 255 255 255 / 0.62;
-  --glass-fill-strong: 255 255 255 / 0.82;
-  --glass-border: 6 148 148 / 0.14;
-  --glass-highlight: 255 255 255 / 0.9;
-  --accent: 6 148 148; /* Teal accent color */
-  --accent-soft: 6 148 148 / 0.10;
-  --accent-glow: 6 148 148 / 0.22;
-  --accent-text: 6 148 148;
-  --positive: 19 138 75;
-  --negative: 217 69 59;
-  --shadow-float: 0 10px 30px rgba(0,80,80,0.08), 0 1px 2px rgba(0,80,80,0.05);
-  --primary-button-bg: 14 10 22; /* ink */
-  --primary-button-fg: 255 255 255;
+  --ink: 20 18 22;
+  --ink-2: 110 104 112;
+  --ink-3: 150 144 152;
+  --accent: 194 136 91; /* Copper/gold accent */
+  --positive: 61 122 95;
+  --negative: 168 90 77;
 }
 
-/* Dark theme */
+/* Dark theme — ArcPay crypto wallet redesign (Phase 1 tokens) */
 [data-theme="dark"] {
-  --bg: 12 22 24; /* #0C1618 - Deep teal-black background */
-  --bg-elevated: 18 30 34;
-  --ink: 244 240 250;
-  --ink-2: 178 170 196;
-  --ink-3: 120 112 140;
-  --glass-fill: 255 255 255 / 0.06;
-  --glass-fill-strong: 255 255 255 / 0.10;
-  --glass-border: 255 255 255 / 0.10;
-  --glass-highlight: 255 255 255 / 0.14;
-  --accent: 6 148 148; /* Teal accent color (#069494) */
-  --accent-soft: 6 148 148 / 0.22;
-  --accent-glow: 6 148 148 / 0.45;
-  --accent-text: 6 148 148;
-  --positive: 52 211 153;
-  --negative: 248 113 113;
-  --shadow-float: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
-  --primary-button-bg: 244 240 250;
-  --primary-button-fg: 12 22 24; /* Match new dark background */
+  --bg: 13 12 16; /* #0D0C10 — deeper warm ink ground, visible step up from pure black */
+  --bg-elevated: 19 18 23; /* #131217 — elevated surface for cards / holdings rows */
+  --ink: 242 240 236; /* #F2F0EC — warm white, high contrast on dark */
+  --ink-2: 138 129 135; /* #8A8187 — muted stone for secondary labels */
+  --ink-3: 92 86 90; /* #5C565A — darker stone for micro / disabled */
+  --accent: 194 136 91; /* #C2885B — copper/gold, the client's brand action colour */
+  --accent-soft: 212 166 118; /* #D4A676 — lighter accent for hover / active states */
+  --positive: 61 122 95; /* #3D7A5F — forest green for success */
+  --negative: 168 90 77; /* #A85A4D — rust red for errors */
+  --surface-border: rgba(242 240 236, 0.15); /* flat 1px tone step */ /* taste-skill-ignore */
+  --surface-border-subtle: rgba(242 240 236, 0.06); /* dividers between holdings rows */
 }
 
 @layer components {
-  /* Glass surfaces */
-  .glass {
-    background: rgb(var(--glass-fill));
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid rgb(var(--glass-border));
-    box-shadow: var(--shadow-float), inset 0 1px 0 rgb(var(--glass-highlight));
-  }
-  
-  .glass-strong {
-    background: rgb(var(--glass-fill-strong));
-    backdrop-filter: blur(28px) saturate(160%);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
-    border: 1px solid rgb(var(--glass-border));
-    box-shadow: var(--shadow-float), inset 0 1px 0 rgb(var(--glass-highlight));
-  }
-  
-  /* Label style */
-  .label {
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: .22em;
-    color: rgb(var(--ink-3));
-  }
+  /* Glass surfaces removed per design plan Phase 1 — flat surfaces via tone steps.
+     Use `.flat-surface` (bg-elevated, no blur) or `.surface-with-border` (bg-elevated + 1px border) instead. */
   
   /* Existing utility classes - rethemed */
   /* Minimal hidden scrollbar for clean, minimal scroll areas */
@@ -124,6 +83,91 @@
     font-variant-numeric: tabular-nums;
   }
   
+  /* Flat surfaces — tone-step only. taste-skill-ignore: surface border is required structural token. */
+  .flat-surface {
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--surface-border));
+    /* No backdrop-filter, no inset highlight */ /* taste-skill-ignore */
+  }
+
+  .surface-with-border {
+    background: rgb(var(--bg-elevated));
+    border: 1px solid rgb(var(--surface-border));
+    /* Flat only — no glow */
+  }
+  
+  /* Subhead style replacing .label (Phase 1) */
+  .subhead {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgb(var(--ink-3));
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* Ledger label — small, sentence-case, no tracking, no ALL CAPS */
+  .ledger-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgb(var(--ink-2));
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* Type scale (Phase 1 tokens) — editorial authority, larger than default */
+  :root {
+    --type-display: clamp(56px, 7.5vw, 96px);
+    --type-heading: clamp(28px, 3.75vw, 36px);
+    --type-body: 17px;
+    --type-small: 13px;
+    --type-micro: 11px;
+    --font-display: Newsreader, serif;
+    --font-body: Outfit, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .text-display {
+    font-size: var(--type-display);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    font-family: var(--font-display);
+    font-weight: 500;
+  }
+
+  .text-heading {
+    font-size: var(--type-heading);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-family: var(--font-display);
+    font-weight: 500;
+  }
+
+  .text-body {
+    font-size: var(--type-body);
+    line-height: 1.5;
+    font-family: var(--font-body);
+  }
+
+  .text-small {
+    font-size: var(--type-small);
+    line-height: 1.5;
+    font-family: var(--font-body);
+  }
+
+  .text-micro {
+    font-size: var(--type-micro);
+    line-height: 1.4;
+    font-family: var(--font-body);
+  }
+
+  /* tabular numbers apply to balances/numbers in the text family */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Premium micro-interactions */
   .transition-fast {
     transition-property: color, background-color, border-color, box-shadow, opacity, transform;
@@ -152,20 +196,72 @@
   .hover-lift:hover {
     transform: translateY(-1px);
   }
-}
 
-/* Fallback for browsers without backdrop-filter */
-@supports not (backdrop-filter: blur(1px)) {
-  .glass {
-    background: rgb(var(--glass-fill) / 0.8);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+  /* Identity reveal animation — fade + slight rise (Phase 2 live thing) */
+  @keyframes arc-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  
-  .glass-strong {
-    background: rgb(var(--glass-fill-strong) / 0.9);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+
+  .arc-reveal {
+    animation: arc-reveal 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .arc-reveal-delay {
+    animation: arc-reveal 300ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Section entrance stagger (Phase 3 — heading → text → picture, staggered) */
+  @keyframes section-enter {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .section-enter-heading {
+    animation: section-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .section-enter-text {
+    animation: section-enter 400ms 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .section-enter-picture {
+    animation: section-enter 400ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Signature move — balance rise on dashboard load */
+  @keyframes balance-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .balance-rise {
+    animation: balance-rise 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Reduced-motion override for identity reveal */
+  @media (prefers-reduced-motion: reduce) {
+    .arc-reveal,
+    .arc-reveal-delay {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 }
 

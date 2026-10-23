@@ -12,7 +12,6 @@ export default {
         'ink-2': 'rgb(var(--ink-2) / <alpha-value>)',
         'ink-3': 'rgb(var(--ink-3) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
-        'accent-text': 'rgb(var(--accent-text) / <alpha-value>)',
         positive: 'rgb(var(--positive) / <alpha-value>)',
         negative: 'rgb(var(--negative) / <alpha-value>)',
       },
@@ -21,12 +20,8 @@ export default {
         display: ['Newsreader', 'Georgia', 'serif'],
       },
       boxShadow: {
-        'glow': '0 0 40px rgb(var(--accent) / 0.35)',
-        'glow-lg': '0 0 48px rgb(var(--accent) / 0.15)',
-        'scan': '0 0 20px rgb(var(--accent) / 0.30), 0 4px 12px rgba(0,0,0,0.4)',
-        'scan-hover': '0 0 28px rgb(var(--accent) / 0.40), 0 6px 16px rgba(0,0,0,0.5)',
+        /* Glow/shadow decorations removed per design plan Phase 1–3 */
         'subtle': '0 1px 3px rgba(0,0,0,0.3)',
-        float: 'var(--shadow-float)',
       },
       borderRadius: {
         'surface': '16px',

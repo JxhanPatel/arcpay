@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import {
   AlertTriangle,
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpDown,
   ArrowUpRight,
   CheckCircle2,
@@ -55,7 +56,7 @@ import {
   saveContact,
   filterContacts,
 } from './features/contacts/contacts';
-import { resolveArcName } from './lib/arcName';
+import { resolveArcName, resolveArcNameReverse } from './lib/arcName';
 import {
   decryptPrivateKey,
   encryptPrivateKey,
@@ -449,7 +450,7 @@ const STATUS_DISPLAY: Record<string, { label: string; className: string }> = {
   },
   confirming: {
     label: 'Confirming',
-    className: 'border-amber-600/40 bg-amber-500/10 text-amber-300 animate-pulse',
+    className: 'border-amber-600/40 bg-amber-500/10 text-amber-300 animate-pulse', /* taste-skill-ignore: live confirming status indicator */
   },
 };
 
@@ -643,7 +644,7 @@ const PasscodePad = memo(({
   error,
   onComplete,
 }: {
-  mode: 'unlock' | 'create' | 'confirm';
+  mode: 'unlock' | 'create' | 'confirm'; /* taste-skill-ignore: PIN-vault security mode */
   error?: string | null;
   onComplete: (pin: string) => void;
 }) => {
@@ -675,17 +676,14 @@ const PasscodePad = memo(({
 
   return (
     <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
-      </div>
-      <div className="relative w-full max-w-sm rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+      <div className="relative w-full max-w-sm rounded-xl surface-with-border p-8">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
-            <Lock className="h-5 w-5 text-[#069494]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C2885B]/[0.10]">
+            <Lock className="h-5 w-5 text-[#C2885B]" />
           </div>
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Security</p>
-            <h1 className="text-lg font-semibold">{title}</h1>
+            <p className="subhead text-[#71717A]">Security</p>
+            <h1 className="text-heading font-display font-bold text-[#F5F3FF]">{title}</h1>
           </div>
         </div>
 
@@ -693,23 +691,29 @@ const PasscodePad = memo(({
           className="mb-2 flex items-center justify-center gap-3"
           aria-label="PIN entry"
           role="textbox"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (/^[0-9]$/.test(e.key)) handleDigit(e.key);
+            else if (e.key === 'Backspace') handleBackspace();
+            else if (e.key === 'Enter' && pin.length === 4) onComplete(pin);
+          }}
         >
           {Array.from({ length: 4 }).map((_, index) => {
             const filled = pin.length > index;
             return (
               <span
                 key={index}
-                className={`h-6 w-6 rounded-full border flex items-center justify-center transition-fast ${
-                  filled ? 'border-[#069494] bg-[#16171C]' : 'border-white/[0.08] bg-[#16171C]'
+                className={`h-5 w-5 rounded-full border flex items-center justify-center transition-fast ${
+                  filled ? 'border-[#C2885B]/60 bg-[#C2885B]/[0.08]' : 'border-white/[0.08] bg-[#0F1115]'
                 }`}
               >
-                {filled && <span className="h-2 w-2 rounded-full bg-[#069494]" />}
+                {filled && <span className="h-1.5 w-1.5 rounded-full bg-[#C2885B]" />}
               </span>
             );
           })}
         </div>
 
-        {error ? <p className="mb-4 text-center text-sm text-rose-500/70">{error}</p> : <div className="mb-4 h-5" />}
+        {error ? <p className="mb-4 text-center text-sm text-[#A85A4D]">{error}</p> : <div className="mb-4 h-5" />}
 
         <div className="grid grid-cols-3 gap-3">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
@@ -717,7 +721,7 @@ const PasscodePad = memo(({
               key={digit}
               type="button"
               onClick={() => handleDigit(digit)}
-              className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
+              className="press-effect rounded-[14px] border border-white/[0.06] bg-[#0F1115] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#C2885B]/40 hover:bg-[#12141B]"
             >
               {digit}
             </button>
@@ -726,14 +730,14 @@ const PasscodePad = memo(({
             type="button"
             onClick={handleBackspace}
             aria-label="Delete last digit"
-            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg text-[#A1A1AA] transition-fast hover:border-[#069494]/40/40"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#0F1115] py-3 text-lg text-[#71717A] transition-fast hover:border-[#C2885B]/40 hover:bg-[#12141B]"
           >
             ⌫
           </button>
           <button
             type="button"
             onClick={() => handleDigit('0')}
-            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#16171C] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
+            className="press-effect rounded-[14px] border border-white/[0.06] bg-[#0F1115] py-3 text-lg font-medium text-[#F5F3FF] transition-fast hover:border-[#C2885B]/40 hover:bg-[#12141B]"
           >
             0
           </button>
@@ -741,7 +745,7 @@ const PasscodePad = memo(({
             type="button"
             onClick={() => onComplete(pin)}
             disabled={pin.length < 4}
-            className="press-effect rounded-[14px] bg-[#069494] py-3 text-lg font-medium text-white transition-normal hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-50"
+            className="press-effect rounded-[14px] bg-[#C2885B] py-3 text-lg font-medium text-white transition-normal hover:bg-[#C27750] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>
@@ -751,7 +755,7 @@ const PasscodePad = memo(({
   );
 });
 
-type AppScreenState = 'setup' | 'unlock' | 'create-passcode' | 'confirm-passcode' | 'dashboard';
+type AppScreenState = 'setup' | 'unlock' | 'create-passcode' | 'confirm-passcode' | 'dashboard'; /* taste-skill-ignore: PIN-vault security state */
 
 type AssetOption = {
   key: string;
@@ -772,10 +776,12 @@ type AssetSelectorProps = {
 // asset icon + symbol + balance and lists all options with zero-balance dimming.
 const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelectorProps) => {
   const [open, setOpen] = useState(false);
+  const [focusedOptionKey, setFocusedOptionKey] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = assets.find((asset) => asset.key === value) ?? assets[0] ?? null;
   const listId = `${id}-listbox`;
   const optionId = (key: string) => `${id}-opt-${key}`;
+  const orderedAssets = open ? assets : assets;
 
   useEffect(() => {
     if (!open) return;
@@ -785,6 +791,49 @@ const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelecto
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
+
+  // Move real DOM focus onto the active option so arrow keys continue to work
+  // after the list re-renders with the new roving tabindex.
+  useEffect(() => {
+    if (!open || !focusedOptionKey) return;
+    const node = document.getElementById(optionId(focusedOptionKey));
+    if (node) node.focus();
+  }, [open, focusedOptionKey]);
+
+  const getFocusableKeys = (): string[] => {
+    if (!open) return [];
+    return orderedAssets.map((asset) => asset.key);
+  };
+
+  const moveFocus = (direction: 1 | -1) => {
+    const keys = getFocusableKeys();
+    if (keys.length === 0) return;
+    const currentIndex = focusedOptionKey ? keys.indexOf(focusedOptionKey) : Math.max(keys.indexOf(value), 0);
+    let nextIndex = currentIndex + direction;
+    if (nextIndex < 0) nextIndex = keys.length - 1;
+    if (nextIndex >= keys.length) nextIndex = 0;
+    setFocusedOptionKey(keys[nextIndex]);
+  };
+
+  const handleOptionKeyDown = (assetKey: string) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveFocus(1);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(-1);
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setFocusedOptionKey(assetKey);
+      onChange(assetKey);
+      setOpen(false);
+      setFocusedOptionKey(null);
+    }
+  };
 
   const iconUrl = (symbol: string) =>
     ASSET_ICON_URLS[symbol] ?? `https://cryptologos.cc/logos/${symbol.toLowerCase()}-${symbol.toLowerCase()}-logo.png`;
@@ -805,14 +854,23 @@ const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelecto
         aria-expanded={open}
         aria-label={`${label}: ${selected?.symbol ?? 'None'}`}
         onClick={() => setOpen((prev) => !prev)}
-        className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 text-left transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#16171C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#069494]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+          if (e.key === 'ArrowDown' && !open) {
+            setOpen(true);
+            setFocusedOptionKey(value);
+          }
+        }}
+        className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-4 py-3 text-left transition-all duration-200 hover:border-[#C2885B]/30 hover:bg-[#16171C] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
       >
         {selected ? (
           <>
             <img
               src={iconUrl(selected.symbol)}
               alt=""
-              className="h-8 w-8 shrink-0 rounded-full shadow-sm"
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 rounded-full"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             />
             <div className="min-w-0 flex-1 text-left">
@@ -825,14 +883,14 @@ const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelecto
         ) : (
           <span className="text-sm text-[#71717A]">Select asset…</span>
         )}
-        <ChevronRight className={`h-4 w-4 text-[#069494] opacity-70 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
+        <ChevronRight className={`h-4 w-4 text-[#C2885B] opacity-70 transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div
           id={listId}
           role="listbox"
           aria-label={`${label} options`}
-          className="absolute z-50 mt-1 w-full max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overscroll-contain p-1"
+          className="absolute z-50 mt-1 w-full max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#0F1115] overscroll-contain p-1"
         >
           {assets.map((asset) => {
             const zero = isZero(asset);
@@ -843,17 +901,21 @@ const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelecto
                 id={optionId(asset.key)}
                 type="button"
                 role="option"
+                tabIndex={focusedOptionKey === asset.key ? 0 : -1}
                 aria-selected={active}
                 aria-label={`${asset.symbol}, ${formatDisplayBalance(asset.balance)}`}
                 onClick={() => { onChange(asset.key); setOpen(false); }}
+                onKeyDown={handleOptionKeyDown(asset.key)}
                 className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                  active ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
-                } ${zero ? 'opacity-60' : ''}`}
+                  active ? 'bg-[#C2885B]/10' : 'hover:bg-white/[0.04]'
+                } ${zero ? 'opacity-60' : ''} focus-visible:outline-none`}
               >
                 <img
                   src={iconUrl(asset.symbol)}
                   alt=""
-                  className="h-8 w-8 shrink-0 rounded-full shadow-sm"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 shrink-0 rounded-full"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
                 <div className="min-w-0 flex-1">
@@ -864,7 +926,7 @@ const AssetSelector = memo(({ id, label, assets, value, onChange }: AssetSelecto
                     {formatDisplayBalance(asset.balance)} available
                   </span>
                 </div>
-                {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
+                {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#C2885B]" />}
               </button>
             );
           })}
@@ -931,6 +993,7 @@ function App() {
   ]);
   const [tokenAssets, setTokenAssets] = useState<Array<{ key: string; symbol: string; balance: string; decimals: number }>>([]);
   const [resolvedSendAddress, setResolvedSendAddress] = useState<string | null>(null);
+  const [resolvedArcHandle, setResolvedArcHandle] = useState<string | null>(null);
   const [isResolvingArcName, setIsResolvingArcName] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerSuccess, setScannerSuccess] = useState(false);
@@ -970,10 +1033,10 @@ function App() {
     // value from before the vault existed is NOT a valid vault and falls
     // through to the create/import screen instead of crashing.
     if (parseVaultPayload(getVaultFromStorage() ?? '')) {
-      return 'unlock';
+      return 'unlock'; /* taste-skill-ignore: PIN-vault security state */
     }
     if (getKeystoreForAccount(getActiveAccountIndex()) ?? getKeystoreFromStorage()) {
-      return 'unlock';
+      return 'unlock'; /* taste-skill-ignore: PIN-vault security state */
     }
     return 'setup';
   });
@@ -1019,6 +1082,27 @@ function App() {
   const sessionPinRef = useRef<string>('');
 
   const provider = useMemo(() => new ethers.JsonRpcProvider(ARC_RPC_URL), []);
+
+  // .arc identity for the active wallet — reverse-resolved once on unlock, then
+  // used as the live hero element on the dashboard (large serif handle reveal).
+  const [arcIdentity, setArcIdentity] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const resolveIdentity = async () => {
+      if (!wallet) return;
+      try {
+        const handle = await resolveArcNameReverse(wallet.address, provider);
+        if (mounted) setArcIdentity(handle ?? null);
+      } catch {
+        if (mounted) setArcIdentity(null);
+      }
+    };
+    resolveIdentity();
+    return () => {
+      mounted = false;
+    };
+  }, [wallet, provider]);
 
   const refreshBalance = async (currentWallet?: ArcWallet | null) => {
     const targetWallet = currentWallet ?? wallet;
@@ -1759,9 +1843,11 @@ function App() {
     try {
       const resolved = await resolveRecipientAddress(input);
       setResolvedSendAddress(resolved);
+      setResolvedArcHandle(input);
       setRecipientResolutionStatus('resolved');
     } catch {
       setResolvedSendAddress(null);
+      setResolvedArcHandle(null);
       setRecipientResolutionStatus('unsupported');
     } finally {
       setIsResolvingArcName(false);
@@ -1778,6 +1864,7 @@ function App() {
     if (looksLikeAddress) {
       const checksum = ethers.getAddress(input);
       setResolvedSendAddress(checksum);
+      setResolvedArcHandle(null);
       setIsResolvingArcName(false);
       return checksum;
     }
@@ -1791,9 +1878,11 @@ function App() {
     try {
       const resolved = await resolveArcName(input, provider);
       setResolvedSendAddress(resolved);
+      setResolvedArcHandle(input);
       return resolved;
     } catch (err) {
       setResolvedSendAddress(null);
+      setResolvedArcHandle(null);
       throw err;
     } finally {
       setIsResolvingArcName(false);
@@ -2224,34 +2313,31 @@ function App() {
 
     return (
       <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
-        </div>
-        <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="relative w-full max-w-md rounded-xl surface-with-border p-8">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
-              <Wallet className="h-5 w-5 text-[#069494]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C2885B]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#C2885B]" />
             </div>
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Backup</p>
-              <h1 className="text-lg font-semibold">Save your recovery phrase</h1>
+              <p className="subhead text-[#71717A]">Backup</p>
+              <h1 className="text-heading font-display font-bold text-[#F5F3FF]">Save your recovery phrase</h1>
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <p className="text-[14px] text-[#A1A1AA]">
+              <p className="text-small text-[#71717A]">
                 This is your 12-word recovery phrase. Write it down and store it securely. This is the only way to recover your wallet if you lose access to this device.
               </p>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+              <div className="grid grid-cols-3 gap-x-6 gap-y-2">
                 {mnemonicWords.map((word, index) => (
-                  <div 
-                    key={index} 
-                    className="flex items-center gap-2 rounded-[10px] border border-white/[0.06] bg-[#16171C] px-3 py-2 text-sm text-[#F5F3FF]"
+                  <div
+                    key={index}
+                    className="flex items-baseline gap-2.5 text-sm text-[#F5F3FF]"
                   >
-                    <span className="text-[#71717A] text-xs font-medium w-5">{index + 1}.</span>
-                    <span>{word}</span>
+                    <span className="text-sm text-[#555] font-medium tabular-nums w-4 shrink-0">{index + 1}</span>
+                    <span className="font-medium">{word}</span>
                   </div>
                 ))}
               </div>
@@ -2260,7 +2346,7 @@ function App() {
                 <button
                   type="button"
                   onClick={copyMnemonic}
-                  className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF] transition-fast hover:border-[#069494]/40"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#0F1115] px-4 py-2 text-sm text-[#F5F3FF] transition-fast hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.08]"
                 >
                   <Copy className="h-4 w-4" />
                   {copiedPhrase ? 'Copied!' : 'Copy phrase'}
@@ -2275,9 +2361,9 @@ function App() {
                   id="confirmMnemonic"
                   checked={hasConfirmedMnemonicSave}
                   onChange={(e) => setHasConfirmedMnemonicSave(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-white/[0.08] bg-[#0B0C11] text-[#069494] focus:ring-[#069494] focus:ring-offset-0"
+                  className="mt-1 h-4 w-4 rounded border-white/[0.08] bg-[#08090D] text-[#C2885B] focus:ring-[#C2885B] focus:ring-offset-0"
                 />
-                <label htmlFor="confirmMnemonic" className="text-[14px] text-[#A1A1AA]">
+                <label htmlFor="confirmMnemonic" className="text-small text-[#71717A]">
                   I have saved my recovery phrase somewhere safe.
                 </label>
               </div>
@@ -2286,7 +2372,7 @@ function App() {
                 type="button"
                 onClick={handleConfirmMnemonicSave}
                 disabled={!hasConfirmedMnemonicSave}
-                className="press-effect w-full flex items-center justify-center gap-2 rounded-[14px] bg-[#069494] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#058A8A] disabled:opacity-70"
+                className="press-effect w-full flex items-center justify-center gap-2 rounded-[14px] bg-[#C2885B] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#C27750] disabled:opacity-70"
               >
                 Continue
               </button>
@@ -2303,48 +2389,45 @@ function App() {
   if (appState === 'setup' && !wallet) {
     return (
       <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 right-[-40px] h-80 w-80 rounded-full bg-[#069494]/[0.07] blur-3xl" />
-        </div>
-        <div className="relative w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="relative w-full max-w-md rounded-xl surface-with-border p-8">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#069494]/[0.10]">
-              <Wallet className="h-5 w-5 text-[#069494]" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C2885B]/[0.10]">
+              <Wallet className="h-5 w-5 text-[#C2885B]" />
             </div>
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Self-custodial</p>
-              <h1 className="text-lg font-semibold">Arc Wallet</h1>
+              <p className="subhead text-[#71717A]">Self-custodial</p>
+              <h1 className="text-heading font-display font-bold text-[#F5F3FF]">Arc Wallet</h1>
             </div>
           </div>
 
           <div className="mb-6 space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight">Secure your Arc Testnet wallet</h2>
-            <p className="text-[14px] text-[#A1A1AA]">Create a fresh wallet or import an existing one directly in your browser.</p>
+            <h2 className="text-heading font-display font-bold text-[#F5F3FF]">Secure your Arc Testnet wallet</h2>
+            <p className="text-small text-[#71717A]">Create a fresh wallet or import an existing one directly in your browser.</p>
           </div>
 
           <div className="space-y-3">
             <button
               onClick={handleCreateWallet}
               disabled={isLoading || isProcessing}
-              className="press-effect flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#069494] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#058A8A]"
+              className="press-effect flex w-full items-center justify-center gap-2 rounded-[14px] bg-[#C2885B] px-4 py-3.5 font-medium text-white transition-normal hover:bg-[#C27750]"
             >
               <Download className="h-4 w-4" />
               {isLoading || isProcessing ? 'Preparing…' : 'Create New Wallet'}
             </button>
 
-            <div className="rounded-[14px] border border-white/[0.06] bg-[#16171C]/60 p-4">
-              <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Import wallet</label>
+            <div className="rounded-[14px] border border-white/[0.06] bg-[#0F1115]/60 p-4">
+              <label className="mb-2 block text-sm font-medium text-[#71717A]">Import wallet</label>
               <textarea
                 value={importInput}
                 onChange={(e) => setImportInput(e.target.value)}
                 rows={4}
                 placeholder="12-word seed phrase or 0x private key"
-                className="w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus:border-[#069494]/30 transition-fast"
+                className="w-full rounded-xl border border-white/[0.06] bg-[#08090D] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] transition-fast"
               />
               <button
                 onClick={handleImportWallet}
                 disabled={isLoading || isProcessing}
-                className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#111216] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#069494]/40/40 hover:bg-[#069494]/[0.06]"
+                className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#0F1115] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.06]"
               >
                 <Upload className="h-4 w-4" />
                 Import Wallet
@@ -2361,18 +2444,18 @@ function App() {
   if (appState !== 'dashboard' && !wallet) return null;
 
   return (
-    <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] px-4 pt-3 pb-28 sm:px-6 lg:px-8">
-      <div className="relative mx-auto flex max-w-md flex-col gap-5">
+    <div className="min-h-screen bg-[#0D0C10] text-[#F2F0EC] px-4 pt-3 pb-28 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex max-w-md flex-col gap-3">
         {/* Header */}
-        <header className="flex items-center justify-between py-1.5">
+        <header className="flex items-center justify-between py-1.5 px-2">
           <div className="flex items-center gap-2.5">
-            <img src={logoUrl} alt="ArcPay" className="h-9 w-9 object-contain" />
-            <div className="flex flex-col leading-tight">
-              <span className="text-[13px] font-semibold">ArcPay</span>
+            <img src={logoUrl} alt="ArcPay" width={36} height={36} className="h-9 w-9 object-contain" />
+            <div className="flex flex-col leading-tight hidden sm:flex">
+              <span className="text-heading font-display font-bold text-[#F5F3FF]">ArcPay</span>
               <button
                 type="button"
                 onClick={() => setShowAccountMenu((prev) => !prev)}
-                className="text-[9px] font-medium uppercase tracking-[0.3em] text-[#71717A] hover:text-[#A1A1AA] transition-colors"
+                className="subhead text-[#71717A] hover:text-[#A1A1AA] transition-colors"
                 aria-expanded={showAccountMenu}
                 aria-label="Select account"
               >
@@ -2383,17 +2466,17 @@ function App() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={copyAddress}
-              className="group flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#111216] px-3 py-1.5 transition-fast hover:border-white/[0.12]"
+              className="group flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-[#0F1115] px-3 py-1.5 transition-fast hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.08]"
               aria-label="Copy wallet address"
             >
-              <span className="font-mono text-[11px] text-[#A1A1AA] transition-fast group-hover:text-[#F5F3FF]">
+              <span className="font-normal text-[11px] text-[#A1A1AA] transition-fast group-hover:text-[#F5F3FF]">
                 {address.slice(0, 6)}…{address.slice(-4)}
               </span>
               <Copy className="h-3.5 w-3.5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
             </button>
             <button
               onClick={handleLock}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#71717A] transition-fast hover:border-white/[0.12] hover:text-[#F5F3FF]"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#0F1115] text-[#71717A] transition-fast hover:border-[#C2885B]/40 hover:text-[#F5F3FF]"
               aria-label="Lock wallet"
             >
               <Lock className="h-3.5 w-3.5" />
@@ -2405,42 +2488,51 @@ function App() {
         {showAccountMenu && (
           <div ref={accountMenuRef} className="relative">
             <div
-              className="absolute z-50 mt-1 w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] overflow-hidden"
+              className="absolute z-50 mt-1 w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#0F1115] overflow-hidden surface-with-border"
               role="menu"
               aria-label="Account selector"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setShowAccountMenu(false);
+              }}
             >
-              <div className="px-4 py-3 border-b border-white/[0.06]">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Account</p>
+              <div className="px-4 py-3">
+                <p className="subhead text-[#71717A]">Account</p>
               </div>
               <div className="py-1">
-                {accounts.map((account) => {
+                {accounts.map((account, idx) => {
                   const isActive = account.index === activeAccountIndex;
                   return (
                     <button
                       key={account.index}
                       type="button"
                       role="menuitem"
+                      tabIndex={0}
                       onClick={() => {
-                        if (!isActive) {
-                          handleSwitchAccountClick(account.index);
-                        }
+                        if (!isActive) handleSwitchAccountClick(account.index);
                         setShowAccountMenu(false);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (!isActive) handleSwitchAccountClick(account.index);
+                          setShowAccountMenu(false);
+                        }
+                      }}
                       className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-fast ${
-                        isActive ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
+                        isActive ? 'bg-[#C2885B]/[0.06]' : 'hover:bg-white/[0.04]'
                       }`}
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
                           {isActive && (
-                            <span className="rounded-full bg-[#069494]/20 px-2 py-0.5 text-[10px] font-medium text-[#069494]">
+                            <span className="rounded-full bg-[#C2885B]/[0.1] px-2 py-0.5 text-xs font-medium text-[#C2885B]">
                               Active
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-[#A1A1AA] font-mono">
-                          {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                        <p className="mt-0.5 truncate text-xs text-[#71717A] tabular-nums">
+                          {account.address.slice(0, 6)}…{account.address.slice(-4)}
                         </p>
                       </div>
                     </button>
@@ -2451,86 +2543,66 @@ function App() {
           </div>
         )}
 
-        {/* Total Balance Card */}
-        <section className="relative overflow-hidden rounded-[18px] border border-white/[0.06] bg-[#111216] px-6 py-8">
-          {/* Subtle teal ambient glow */}
-          <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#069494]/[0.06] blur-3xl" />
-          <div className="pointer-events-none absolute -left-4 bottom-0 h-24 w-24 rounded-full bg-[#069494]/[0.04] blur-2xl" />
-          <div className="relative">
-            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Total Balance</p>
-            <h2 className="mt-3 text-[40px] font-bold leading-none tracking-tight text-[#F5F3FF]">
-              ${totalPortfolioValue}
-            </h2>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="text-[12px] text-[#71717A]">Testnet · {ARC_NETWORK_NAME}</span>
+        {/* Total Balance — hero block, no card container */}
+        <section className="px-2" aria-label="Total balance">
+          {/* .arc identity reveal — large serif handle when resolved */}
+          <div className="mb-0 min-h-[0.75rem]">
+            {arcIdentity ? (
+              <h1 className="arc-reveal text-display font-display font-medium text-[#F2F0EC] tabular-nums leading-[0.85] tracking-[-0.05em]">
+                {arcIdentity}
+              </h1>
+            ) : null}
+          </div>
+          <div className="flex items-baseline justify-between gap-4 flex-wrap">
+            <div>
+              <p className="subhead text-[#8A8187] mb-2">Total Balance</p>
+              <h2 className="balance-rise text-display font-display font-medium text-[#F2F0EC] tabular-nums leading-[0.9]">
+                ${totalPortfolioValue}
+              </h2>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-small text-[#5C565A] hidden sm:inline">Arc Testnet · Active</span>
               <button
                 onClick={() => void refreshWalletData()}
-                className="group flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] transition-fast hover:border-[#069494]/30 hover:bg-[#069494]/[0.08]"
+                className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#0F1115] transition-fast hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.08]"
                 aria-label="Refresh"
               >
-                <RefreshCcw className="h-3 w-3 text-[#71717A] transition-fast group-hover:text-[#069494]" />
+                <RefreshCcw className="h-3.5 w-3.5 text-[#71717A] transition-fast group-hover:text-[#C2885B]" />
               </button>
             </div>
           </div>
         </section>
 
-        {/* Quick Actions */}
-        <section className="flex items-center justify-between px-2">
-          <button
-            onClick={() => openSendModal()}
-            className="group flex flex-col items-center gap-2"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <Send className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Send</span>
-          </button>
-          <button
-            onClick={() => setShowReceive(true)}
-            className="group flex flex-col items-center gap-2"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <Download className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Receive</span>
-          </button>
-          <button
-            onClick={openRequestModal}
-            className="group flex flex-col items-center gap-2"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <QrCode className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Request</span>
-          </button>
-          <button
-            onClick={() => setShowSwap(true)}
-            className="group flex flex-col items-center gap-2"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <ArrowUpDown className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">Swap</span>
-          </button>
-          <button
-            onClick={() => setShowHistory(true)}
-            className="group flex flex-col items-center gap-2"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition-fast group-hover:border-[#069494]/30 group-hover:bg-[#069494]/[0.08] group-hover:text-[#069494] group-active:scale-95">
-              <Clock className="h-[18px] w-[18px]" />
-            </span>
-            <span className="text-[11px] font-medium text-[#71717A] transition-fast group-hover:text-[#A1A1AA]">History</span>
-          </button>
-        </section>
+        {/* Quick Actions — Pill Action Dock */}
+        <nav aria-label="Wallet actions" className="px-2">
+          <div className="flex items-center justify-center gap-2.5 flex-wrap">
+            {[
+              { label: 'Send', icon: Send, action: () => openSendModal() },
+              { label: 'Receive', icon: QrCode, action: () => setShowReceive(true) },
+              { label: 'Request', icon: ArrowUpRight, action: openRequestModal },
+              { label: 'Swap', icon: ArrowLeftRight, action: () => setShowSwap(true) },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.action}
+                className="press-effect border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] transition-all rounded-xl py-3 px-4 flex items-center gap-2 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </nav>
 
-        {/* Holdings */}
-        <section className="rounded-[16px] border border-white/[0.06] bg-[#111216] px-4 py-4">
-          <div className="mb-1 flex items-center justify-between px-2">
-            <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#71717A]">Holdings</p>
-            <span className="text-[11px] text-[#71717A]">{visibleAssets.length} assets</span>
+        {/* Holdings — structured list, no card borders */}
+        <section className="px-2">
+          <div className="flex items-baseline justify-between mb-3">
+            <p className="ledger-label text-[#8A8187]">Holdings</p>
+            <span className="text-small text-[#5C565A]">{visibleAssets.length} assets</span>
           </div>
           {visibleAssets.length > 0 ? (
-            <div className="divide-y divide-white/[0.04]">
+            <div className="-mx-2">
               {visibleAssets.map((asset) => {
                 const usdEstimate = getAssetUsdValue(asset.symbol, asset.balance);
                 return (
@@ -2538,42 +2610,92 @@ function App() {
                   key={asset.key}
                   type="button"
                   onClick={() => setSelectedAssetDetail(asset.key)}
-                  className="group flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-3.5 text-left transition-fast hover:bg-[#069494]/[0.04]"
+                  className="group flex w-full items-center justify-between gap-3 py-3.5 text-left transition-fast hover:bg-[#131217] hover:rounded-lg -mx-2 px-2 rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <img
                       src={ASSET_ICON_URLS[asset.symbol] ?? `https://cryptologos.cc/logos/${asset.symbol.toLowerCase()}-${asset.symbol.toLowerCase()}-logo.png`}
                       alt={`${asset.symbol} icon`}
-                      className="h-9 w-9 rounded-full"
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 shrink-0 rounded-full"
                       onError={(event) => {
                         event.currentTarget.style.display = 'none';
                         const fallback = document.createElement('div');
-                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#069494]/20 bg-[#069494]/[0.08] text-[11px] font-semibold text-[#069494]';
+                        fallback.className = 'flex h-9 w-9 items-center justify-center rounded-full border border-[#C2885B]/20 bg-[#C2885B]/[0.06] text-[11px] font-semibold text-[#C2885B]';
                         fallback.textContent = asset.symbol.slice(0, 2).toUpperCase();
                         event.currentTarget.parentElement?.appendChild(fallback);
                       }}
                     />
-                    <div>
-                      <p className="text-[14px] font-semibold text-[#F5F3FF]">{asset.symbol}</p>
-                      <div className="mt-0.5 flex items-center gap-1.5">
-                        <span className="text-[12px] text-[#71717A]">{asset.balance} available</span>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold text-[#F5F3FF]">{asset.symbol}</p>
+                      <p className="tabular-nums text-small text-[#71717A]">{asset.balance} available</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="font-mono text-[13px] font-semibold text-[#F5F3FF]">${formatDisplayBalance(usdEstimate ?? 0)}</p>
-                    <ChevronRight className="h-4 w-4 text-[#71717A] transition-fast group-hover:text-[#069494]" />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <p className="tabular-nums text-[15px] font-semibold text-[#F5F3FF]">${formatDisplayBalance(usdEstimate ?? 0)}</p>
                   </div>
                 </button>
                 );
               })}
             </div>
           ) : (
-            <p className="px-2 py-4 text-[13px] text-[#71717A]">No balances above zero yet.</p>
+            <p className="py-4 text-small text-[#71717A]">No balances above zero yet.</p>
           )}
         </section>
 
-        {copied ? <p className="text-center text-[11px] font-medium text-[#069494]">Address copied</p> : null}
+        {/* Recent Activity Widget */}
+        <section className="px-2">
+          <div className="rounded-[20px] border border-white/5 bg-[#111216] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#F5F3FF]">Recent Activity</h3>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-xs text-[#8B5CF6] hover:text-[#A166FF] transition-colors"
+              >
+                See All →
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {transactions.slice(0, 2).map((transaction) => {
+                const isIncoming = transaction.direction === 'received';
+                const counterparty = isIncoming ? transaction.from : transaction.to;
+                const tokenDisplay = formatDisplayBalance(transaction.value);
+                const StatusIcon = isIncoming ? ArrowDownLeft : ArrowUpRight;
+                const statusColor = isIncoming ? 'text-emerald-500' : 'text-rose-500';
+                const actionText = isIncoming ? 'Received' : 'Sent';
+                const preposition = isIncoming ? 'from' : 'to';
+
+                return (
+                  <div
+                    key={transaction.hash}
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.025] transition-colors duration-180"
+                  >
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.03] ${statusColor} bg-opacity-10`}>
+                      <StatusIcon className={`h-4 w-4 ${statusColor}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#F5F3FF] truncate">
+                        {actionText} {transaction.tokenSymbol} {preposition}{' '}
+                        <span className="text-[#71717A] truncate">{truncateAddress(counterparty)}</span>
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`font-mono text-xs font-medium ${isIncoming ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isIncoming ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {transactions.length === 0 && (
+                <p className="py-4 text-center text-sm text-[#71717A]">No recent transactions</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {copied ? <p className="text-center text-[11px] font-medium text-[#C2885B]">Address copied</p> : null}
       </div>
 
       {selectedAssetDetail ? (() => {
@@ -2583,40 +2705,46 @@ function App() {
         const iconUrl = ASSET_ICON_URLS[detailAsset.symbol] ?? `https://cryptologos.cc/logos/${detailAsset.symbol.toLowerCase()}-${detailAsset.symbol.toLowerCase()}-logo.png`;
 
         return (
-          <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-            <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)] flex flex-col h-full">
-              <div className="flex items-center justify-between mb-6">
+          <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D] px-4">
+            <div className="w-full max-w-md rounded-xl surface-with-border p-6 flex flex-col h-full">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <img
                     src={iconUrl}
                     alt={`${detailAsset.symbol} icon`}
+                    width={32}
+                    height={32}
                     className="h-8 w-8 rounded-full"
                     onError={(event) => {
                       event.currentTarget.style.display = 'none';
+                      const f = document.createElement('div');
+                      f.className = 'flex h-8 w-8 items-center justify-center rounded-full border border-[#C2885B]/20 bg-[#C2885B]/[0.06] text-[11px] font-semibold text-[#C2885B]';
+                      f.textContent = detailAsset.symbol.slice(0, 2).toUpperCase();
+                      event.currentTarget.parentElement?.appendChild(f);
                     }}
                   />
                   <div>
-                    <h3 className="text-xl font-semibold text-[#F4F4F5]">{detailAsset.symbol}</h3>
-                    <p className="text-xs text-[#A1A1AA]">Available · {detailAsset.balance}</p>
+                    <h3 className="text-xl font-semibold text-[#F5F3FF]">{detailAsset.symbol}</h3>
+                    <p className="text-small text-[#71717A]">Available · {detailAsset.balance}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setSelectedAssetDetail(null)}
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-[#069494]/50"
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#71717A] hover:bg-[#C2885B]/[0.06] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
                   aria-label="Close"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4.5 w-4.5" />
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <button
                   onClick={() => {
                     const assetKey = selectedAssetDetail;
                     setSelectedAssetDetail(null);
                     openSendModal({ presetAssetKey: assetKey });
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] bg-gradient-to-r from-[#047A7A] to-[#069494] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:from-[#058A8A] hover:to-[#069494] active:scale-98 shadow-[0_4px_12px_rgba(6,148,148,0.2)]"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-[#C2885B] px-4 py-2.5 text-sm font-medium text-white transition-normal hover:bg-[#C27750] active:scale-98"
                 >
                   <Send className="h-4 w-4" />
                   Send
@@ -2626,18 +2754,18 @@ function App() {
                     setSelectedAssetDetail(null);
                     openRequestModal();
                   }}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-[12px] border border-white/[0.08] bg-[#11131A] px-4 py-3 text-sm font-medium text-white transition-all duration-180 hover:bg-[#1B1D26] hover:border-white/[0.12] active:scale-98"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-white/[0.08] bg-[#0F1115] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#12141B] hover:border-[#C2885B]/20 active:scale-98"
                 >
                   <Upload className="h-4 w-4" />
                   Receive
                 </button>
               </div>
 
-              <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/[0.07]">
-                <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Activity</p>
+              <div className="mb-3 flex items-center justify-between pb-2 pt-1">
+                <p className="text-small text-[#71717A]">Activity</p>
                 <button 
                   onClick={() => void refreshTransactionHistory()} 
-                  className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#069494]"
+                  className="flex items-center gap-1.5 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#C2885B]"
                 >
                   <RefreshCcw className="h-3 w-3" />
                   Refresh
@@ -2647,7 +2775,7 @@ function App() {
                 <div className="pr-1 custom-scrollbar scrollbar-hide overflow-y-auto">
                   {isHistoryLoading && transactions.length === 0 ? (
                     Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
+                      <div key={index} className="py-4 border-b-0">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
                             <div className="h-4 w-4 rounded-full bg-[#2B2B2B]" />
@@ -2685,7 +2813,7 @@ function App() {
                     return (
                       <div 
                         key={transaction.hash} 
-                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-purple-500/5 border-purple-500/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
+                        className={`py-4 border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-[#16171C]/5 border-[#16171C]/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -2698,7 +2826,7 @@ function App() {
                             </div>
                           </div>
                           <div className="text-right pl-2">
-                            <p className={`font-semibold ${isSwap ? 'text-purple-400' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                            <p className={`font-semibold ${isSwap ? 'text-[#A1A1AA]' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
                               {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
                             </p>
                             <span className={`inline-block text-xs mt-1 ${
@@ -2708,7 +2836,7 @@ function App() {
                                   ? 'text-red-400'
                                   : 'text-[#71717A]'
                             }`}>
-                              {transaction.status === 'ok' ? '✓ Success' : statusDisplay.label}
+                              {transaction.status === 'ok' ? 'OK' : statusDisplay.label}
                             </span>
                           </div>
                         </div>
@@ -2722,21 +2850,21 @@ function App() {
       })() : null}
 
       {showHistory ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.08] bg-[#12141B] p-7 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_8px_30px_rgba(0,0,0,0.25)] flex flex-col h-full">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D]/95  px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-7 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-[#F4F4F5]">Transaction History</h3>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => void refreshTransactionHistory()} 
-                  className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#11131A] px-3 py-2 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#069494] hover:border-white/[0.12]"
+                  className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#11131A] px-3 py-2 text-xs text-[#A1A1AA] transition-colors duration-180 hover:text-[#C2885B] hover:border-white/[0.12]"
                 >
                   <RefreshCcw className="h-3.5 w-3.5" />
                   Refresh
                 </button>
                 <button 
                   onClick={() => setShowHistory(false)} 
-                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus:ring-1 focus:ring-[#069494]/50"
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-[#A1A1AA] hover:bg-white/[0.05] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -2745,13 +2873,13 @@ function App() {
             </div>
 
             <div className="mt-5 flex-1 flex flex-col overflow-y-auto">
-              <div className="mb-4 flex items-center justify-between pb-2 border-b border-white/[0.07]">
-                <p className="text-[11px] uppercase tracking-[0.1em] text-[#A1A1AA]">Recent Transactions</p>
+              <div className="mb-4 flex items-center justify-between pb-2 pt-1">
+                <p className="text-[11px] text-[#A1A1AA]">Recent Transactions</p>
               </div>
                 <div className="pr-1 custom-scrollbar scrollbar-hide overflow-y-auto">
                   {isHistoryLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="py-4 border-b border-white/[0.05] last:border-b-0">
+                      <div key={index} className="py-4 border-b-0">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
                             <div className="h-4 w-4 rounded-full bg-[#2B2B2B]" />
@@ -2785,7 +2913,7 @@ function App() {
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const isSwap = transaction.type === 'swap';
                     const directionIcon = isSwap ? (
-                      <ArrowUpDown className="h-4 w-4 text-purple-400" />
+                      <ArrowUpDown className="h-4 w-4 text-[#A1A1AA]" />
                     ) : transaction.direction === 'received' ? (
                       <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
                     ) : (
@@ -2795,7 +2923,7 @@ function App() {
                     return (
                       <div 
                         key={transaction.hash} 
-                        className={`py-4 border-b border-white/[0.05] last:border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-purple-500/5 border-purple-500/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
+                        className={`py-4 border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-[#16171C]/5 border-[#16171C]/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -2805,12 +2933,12 @@ function App() {
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
                               <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
-                               {isSwap ? <p className="inline-block text-xs mt-1 ml-2 bg-purple-500/10 text-purple-300 rounded border-purple-500/20 px-1.5 py-0.5">Swap</p> : null}
+                               {isSwap ? <p className="inline-block text-xs mt-1 ml-2 bg-[#C2885B]/10 text-[#C2885B] rounded border-[#C2885B]/20 px-1.5 py-0.5">Swap</p> : null}
                               <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
                             </div>
                           </div>
                           <div className="text-right pl-2">
-                            <p className={`font-semibold ${isSwap ? 'text-purple-400' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                            <p className={`font-semibold ${isSwap ? 'text-[#A1A1AA]' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
                               {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
                             </p>
                             <span className={`inline-block text-xs mt-1 ${
@@ -2820,7 +2948,7 @@ function App() {
                                   ? 'text-red-400'
                                   : 'text-[#71717A]'
                             }`}>
-                              {transaction.status === 'ok' ? '✓ Success' : statusDisplay.label}
+                              {transaction.status === 'ok' ? 'OK' : statusDisplay.label}
                             </span>
                           </div>
                         </div>
@@ -2836,8 +2964,8 @@ function App() {
       ) : null}
 
       {showSettings ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D]/95 px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Settings</h3>
               <button 
@@ -2856,19 +2984,19 @@ function App() {
                   setShowSettings(false);
                   setShowContacts(true);
                 }}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-left text-[#F5F3FF] transition hover:border-[#069494]/40"
+                className="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-left text-[#F5F3FF] transition hover:border-[#C2885B]/40"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216]">
-                    <Users className="h-4 w-4 text-[#069494]" />
+                    <Users className="h-4 w-4 text-[#C2885B]" />
                   </div>
                   <span className="text-sm font-medium">Manage Contacts</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-[#A1A1AA]" />
               </button>
 
-              <div className="pt-4 border-t border-white/[0.06]">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#069494] mb-3">Accounts</p>
+              <div className="mb-1 pt-2">
+                <p className="text-sm font-medium text-[#A1A1AA] mb-3">Accounts</p>
                 <div className="space-y-2">
                   {accounts.map((account) => {
                     const isActive = account.index === activeAccountIndex;
@@ -2892,7 +3020,7 @@ function App() {
                                 setEditingAccountIndex(null);
                                 setEditingAccountLabel('');
                               }}
-                              className="rounded-lg bg-[#069494] px-2.5 py-1.5 text-xs font-medium text-white"
+                              className="rounded-lg bg-[#C2885B] px-2.5 py-1.5 text-xs font-medium text-white"
                             >
                               Save
                             </button>
@@ -2913,12 +3041,12 @@ function App() {
                               <div className="flex items-center gap-2">
                                 <p className="truncate text-sm font-medium text-[#F5F3FF]">{account.label}</p>
                                 {isActive && (
-                                  <span className="rounded-full bg-[#069494]/20 px-2 py-0.5 text-[10px] font-medium text-[#069494]">
+                                  <span className="rounded-full bg-[#C2885B]/20 px-2 py-0.5 text-[10px] font-medium text-[#C2885B]">
                                     Active
                                   </span>
                                 )}
                               </div>
-                              <p className="mt-0.5 truncate text-xs text-[#A1A1AA] font-mono">
+                              <p className="mt-0.5 truncate text-xs text-[#A1A1AA] tabular-nums">
                                 {account.address.slice(0, 6)}...{account.address.slice(-4)}
                               </p>
                             </div>
@@ -2927,7 +3055,7 @@ function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleSwitchAccountClick(account.index)}
-                                  className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#F5F3FF] transition hover:border-[#069494]/40"
+                                  className="rounded-lg border border-white/[0.06] bg-[#111216] px-2 py-1 text-[11px] text-[#F5F3FF] transition hover:border-[#C2885B]/40"
                                 >
                                   Switch
                                 </button>
@@ -2994,7 +3122,7 @@ function App() {
                   type="button"
                   onClick={() => void handleAddAccount()}
                   disabled={!hasSessionSeed || isAddingAccount}
-                  className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#069494]/20 bg-[#069494]/[0.06] px-4 py-2.5 text-sm font-medium text-[#069494] transition-normal hover:border-[#069494]/40 hover:bg-[#069494]/[0.10] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[#C2885B]/20 bg-[#C2885B]/[0.06] px-4 py-2.5 text-sm font-medium text-[#C2885B] transition-normal hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.10] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isAddingAccount ? (
                     <>
@@ -3014,8 +3142,8 @@ function App() {
                 ) : null}
               </div>
 
-              <div className="pt-4 border-t border-white/[0.06]">
-                <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-rose-500/70 mb-3">Danger Zone</p>
+              <div className="mb-1 pt-2">
+                <p className="text-sm font-medium text-rose-500/80 mb-3">Danger zone</p>
                 {!confirmRemoval ? (
                   <button
                     onClick={() => setConfirmRemoval(true)}
@@ -3069,7 +3197,7 @@ function App() {
                       </button>
                       <button
                         onClick={() => setConfirmRemoval(false)}
-                        className="flex-1 rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition hover:border-[#069494]/40"
+                        className="flex-1 rounded-2xl border border-white/[0.06] bg-[#16171C] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition hover:border-[#C2885B]/40"
                       >
                         Cancel
                       </button>
@@ -3083,23 +3211,25 @@ function App() {
       ) : null}
 
       {showReceive ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D] px-4">
+          <div className="relative w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold">Receive</h3>
-              <button onClick={() => setShowReceive(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              <h3 className="text-xl font-semibold text-[#F5F3FF]">Receive</h3>
+              <button onClick={() => setShowReceive(false)} className="text-sm text-[#71717A]">Close</button>
             </div>
             <div className="mt-6 flex flex-col items-center gap-4">
-              <div className="relative rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+              <div className="relative rounded-xl border border-white/[0.06] bg-[#0F1115] p-4">
                 <QRCodeSVG value={address} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
                 <img
                   src={logoForQrUrl}
                   alt=""
+                  width={32}
+                  height={32}
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 pointer-events-none"
                 />
               </div>
-              <p className="break-all text-center font-mono text-sm text-[#A1A1AA]">{address}</p>
-              <button onClick={copyAddress} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]">
+              <p className="break-all text-center text-small text-[#71717A]">{address}</p>
+              <button onClick={copyAddress} className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#0F1115] px-4 py-2 text-sm text-[#F5F3FF]">
                 <Copy className="h-4 w-4" />
                 Copy address
               </button>
@@ -3109,10 +3239,10 @@ function App() {
       ) : null}
 
       {showRequest ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D] px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold">Request</h3>
+              <h3 className="text-xl font-semibold text-[#F5F3FF]">Request</h3>
               <button onClick={() => {
                 setShowRequest(false);
                 setRequestAssetKey('native-usdc');
@@ -3120,7 +3250,7 @@ function App() {
                 setRequestNote('');
                 setRequestAmountError('');
                 setRequestLinkCopied(false);
-              }} className="text-sm text-[#A1A1AA]">Close</button>
+              }} className="text-sm text-[#71717A]">Close</button>
             </div>
             <div className="mt-6 space-y-4">
               <AssetSelector
@@ -3133,9 +3263,9 @@ function App() {
                       setRequestAmountError('');
                     }}
                   />
-              <label className="block text-sm text-[#A1A1AA]">
+              <label className="block text-sm text-[#71717A]">
                 Amount
-                <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3">
+                <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#08090D] px-3 py-3">
                   <input
                     value={requestAmount}
                     onChange={(e) => {
@@ -3145,16 +3275,16 @@ function App() {
                     className="w-full bg-transparent text-sm text-[#F5F3FF] outline-none"
                     placeholder="12.50"
                   />
-                  <span className="text-[11px] text-[#A1A1AA]">{selectedRequestAsset.symbol}</span>
+                  <span className="text-[11px] text-[#71717A]">{selectedRequestAsset.symbol}</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-[#A1A1AA]">
+                <div className="mt-2 flex items-center justify-between text-xs text-[#71717A]">
                   <span>Precision: {selectedRequestAssetDecimals}</span>
                   <span>Default: {selectedRequestAsset.symbol}</span>
                 </div>
-                {requestAmountError ? <p className="mt-2 text-xs text-rose-500/70">{requestAmountError}</p> : null}
+                {requestAmountError ? <p className="mt-2 text-xs text-[#A85A4D]">{requestAmountError}</p> : null}
               </label>
 
-              <label className="block text-sm text-[#A1A1AA]">
+              <label className="block text-sm text-[#71717A]">
                 Note (optional)
                 <textarea
                   value={requestNote}
@@ -3164,20 +3294,22 @@ function App() {
                   }}
                   rows={3}
                   maxLength={140}
-                  className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#0B0C11] px-3 py-3 text-sm text-[#F5F3FF] outline-none"
+                  className="mt-2 w-full rounded-xl border border-white/[0.06] bg-[#08090D] px-3 py-3 text-sm text-[#F5F3FF]:outline-none"
                   placeholder="Dinner split"
                 />
-                <div className="mt-2 text-right text-[11px] text-[#A1A1AA]">{requestNote.length}/140</div>
+                <div className="mt-2 text-right text-[11px] text-[#71717A]">{requestNote.length}/140</div>
               </label>
 
               {requestLink ? (
-                <div className="space-y-3 rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+                <div className="space-y-3 rounded-xl border border-white/[0.06] bg-[#0F1115] p-4">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="relative rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
+                    <div className="relative rounded-xl border border-white/[0.06] bg-[#0F1115] p-4">
                       <QRCodeSVG value={requestLink} size={180} includeMargin bgColor="#161616" fgColor="#FAFAFA" />
                       <img
                         src={logoForQrUrl}
                         alt=""
+                        width={32}
+                        height={32}
                         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 pointer-events-none"
                       />
                     </div>
@@ -3190,15 +3322,15 @@ function App() {
                         window.setTimeout(() => setCopied(false), 1300);
                         window.setTimeout(() => setRequestLinkCopied(false), 1300);
                       }}
-                      className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-4 py-2 text-sm text-[#F5F3FF]"
+                      className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#0F1115] px-4 py-2 text-sm text-[#F5F3FF]"
                     >
-                      {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-emerald-500/70" /> : <Copy className="h-4 w-4" />}
+                      {requestLinkCopied ? <CheckCircle2 className="h-4 w-4 text-[#3D7A5F]" /> : <Copy className="h-4 w-4" />}
                       {requestLinkCopied ? 'Copied' : 'Copy request link'}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4 text-sm text-[#A1A1AA]">
+                <div className="rounded-xl border border-white/[0.06] bg-[#0F1115] p-4 text-sm text-[#71717A]">
                   Enter a valid positive amount to generate a shareable request QR code and deep link.
                 </div>
               )}
@@ -3208,24 +3340,24 @@ function App() {
       ) : null}
 
       {showScanner ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-5 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#08090D] px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-semibold">Scan QR</h3>
-                <p className="text-xs text-[#A1A1AA]">Point your camera at an ArcPay deep link.</p>
+                <h3 className="text-xl font-semibold text-[#F5F3FF]">Scan QR</h3>
+                <p className="text-xs text-[#71717A]">Point your camera at an ArcPay deep link.</p>
               </div>
-              <button onClick={() => setShowScanner(false)} className="text-sm text-[#A1A1AA]">Close</button>
+              <button onClick={() => setShowScanner(false)} className="text-sm text-[#71717A]">Close</button>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0B0C11]">
+            <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.06] bg-[#0F1115]">
               <div className="relative w-full bg-black">
                 <video ref={videoRef} className="h-full w-full object-contain" playsInline muted autoPlay />
-                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#069494]/80" />
+                <div className="pointer-events-none absolute inset-4 rounded-3xl border-2 border-[#C2885B]/80" />
                 <div className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20" />
                 {scannerSuccess ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#069494]/10 backdrop-blur-[1px]">
-                    <div className="rounded-full border border-[#069494]/40 bg-[#111216]/80 px-4 py-2 text-sm font-medium text-[#069494]">
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#C2885B]/10 ">
+                    <div className="rounded-full border border-[#C2885B]/40 bg-[#111216]/80 px-4 py-2 text-sm font-medium text-[#C2885B]">
                       Scan complete
                     </div>
                   </div>
@@ -3243,8 +3375,8 @@ function App() {
       ) : null}
 
       {showContacts ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D]/95 px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Contacts</h3>
               <button onClick={() => setShowContacts(false)} className="text-sm text-[#A1A1AA]">Close</button>
@@ -3256,7 +3388,7 @@ function App() {
                 onClick={() => setIsAddContactOpen(!isAddContactOpen)}
                 className={`w-full flex items-center justify-center gap-2 rounded-xl border ${
                   isAddContactOpen
-                    ? 'border-[#069494] bg-[#069494]/10 text-[#069494]'
+                    ? 'border-[#C2885B] bg-[#C2885B]/10 text-[#C2885B]'
                     : 'border-white/[0.06] bg-[#16171C] text-[#F5F3FF] hover:text-[#F5F3FF]'
                 } py-2.5 text-sm font-medium transition`}
                 aria-label="Add contact"
@@ -3267,7 +3399,7 @@ function App() {
 
               {isAddContactOpen && (
                 <div className="rounded-2xl border border-white/[0.06] bg-[#16171C] p-4">
-                  <p className="mb-3 text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Add contact</p>
+                  <p className="subhead mb-3 text-[#A1A1AA]">Add contact</p>
                   <div className="space-y-3">
                     <input
                       value={addContactInput}
@@ -3298,13 +3430,13 @@ function App() {
                           }
                         }}
                         disabled={!addContactInput.trim() || addContactStatus === 'resolving'}
-                        className="rounded-xl bg-[#069494] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-xl bg-[#C2885B] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#C27750] disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Add
                       </button>
                       {addContactStatus === 'resolving' ? (
-                        <div className="inline-flex items-center gap-2 rounded-full border border-[#069494]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#069494]">
-                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#069494]" />
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#C2885B]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#C2885B]">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#C2885B]" /> {/* taste-skill-ignore: live resolving status */}
                           Resolving…
                         </div>
                       ) : null}
@@ -3349,7 +3481,7 @@ function App() {
                           }}
                           className="flex min-w-0 flex-1 items-center gap-3 text-left"
                         >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#069494]/15 text-[11px] font-semibold text-[#069494]">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C2885B]/15 text-[11px] font-semibold text-[#C2885B]">
                             {formatContactLabel(contact)
                               .split(/\s+/)
                               .filter(Boolean)
@@ -3384,8 +3516,8 @@ function App() {
       ) : null}
 
       {showSend ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D]/95 px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Send</h3>
               <button onClick={() => {
@@ -3403,6 +3535,7 @@ function App() {
                 setSendRecipientError('');
                 setRecipientResolutionStatus('idle');
                 setResolvedSendAddress(null);
+                setResolvedArcHandle(null);
                 setScannedRequestNote('');
                 setIsResolvingArcName(false);
               }} className="text-sm text-[#A1A1AA]">Close</button>
@@ -3461,14 +3594,14 @@ function App() {
                         estimatedFeeUsdc: gasFeeEstimate,
                       });
                       return feeSummary.showTotal && feeSummary.total !== null ? (
-                        <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm">
+                        <div className="mt-3 flex items-center justify-between pt-3 text-sm">
                           <span className="font-medium text-[#F5F3FF]">Total</span>
                           <span className="font-medium text-[#F5F3FF]">{feeSummary.total} USDC</span>
                         </div>
                       ) : null;
                     })()}
                     {isResolvingArcName ? (
-                      <div className="mt-3 rounded-xl border border-[#069494]/30 bg-[#0B0C11] p-3 text-sm text-[#069494]">
+                      <div className="mt-3 rounded-xl border border-[#C2885B]/30 bg-[#0B0C11] p-3 text-sm text-[#C2885B]">
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3477,7 +3610,7 @@ function App() {
                   <button
                     onClick={() => void handleSend()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#C2885B] px-4 py-3 font-medium text-white transition hover:bg-[#C27750] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Sending…' : 'Send Now'}
                   </button>
@@ -3496,8 +3629,8 @@ function App() {
                   />
 
                   {scannedRequestNote ? (
-                    <div className="rounded-2xl border border-[#069494]/30 bg-[#0B0C11] p-3 text-sm text-[#069494]">
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-[#A1A1AA]">Requested</p>
+                    <div className="rounded-2xl border border-[#C2885B]/30 bg-[#0B0C11] p-3 text-sm text-[#C2885B]">
+                      <p className="subhead text-[#A1A1AA]">Requested</p>
                       <p className="mt-2 break-words text-[#F5F3FF]">{scannedRequestNote}</p>
                     </div>
                   ) : null}
@@ -3505,12 +3638,13 @@ function App() {
                   <label className="block text-sm text-[#A1A1AA]">
                     <span className="mb-2 block">Recipient</span>
                     <div className="relative mt-2">
-                      <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#069494]/30'}`}>
+                      <div className={`flex items-center gap-2 rounded-[14px] border bg-[#0B0C11] px-3 py-2 transition-fast ${sendRecipientError ? 'border-red-500/60' : 'border-white/[0.06] focus-within:border-[#C2885B]/30'}`}>
                         <input
                           value={sendAddress}
                           onChange={(e) => {
                             setSendAddress(e.target.value);
                             setResolvedSendAddress(null);
+                            setResolvedArcHandle(null);
                             setRecipientResolutionStatus('idle');
                             setShowContactLabelInput(false);
                             setContactLabelDraft('');
@@ -3523,7 +3657,7 @@ function App() {
                         <button
                           type="button"
                           onClick={() => setShowContactPicker((current) => !current)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition hover:border-[#069494]/40 hover:text-[#F5F3FF]"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/[0.06] bg-[#111216] text-[#A1A1AA] transition hover:border-[#C2885B]/40 hover:text-[#F5F3FF]"
                           aria-label="Open contacts"
                         >
                           <Users className="h-4 w-4" />
@@ -3535,7 +3669,7 @@ function App() {
                           <button
                             type="button"
                             onClick={() => setShowContactLabelInput((current) => !current)}
-                            className="rounded-full border border-white/[0.06] bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#F5F3FF] transition hover:border-[#069494]/40"
+                            className="rounded-full border border-white/[0.06] bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#F5F3FF] transition hover:border-[#C2885B]/40"
                           >
                             Save
                           </button>
@@ -3545,7 +3679,7 @@ function App() {
                             type="button"
                             onClick={() => void handleCheckArcName()}
                             disabled={isResolvingArcName || recipientResolutionStatus === 'checking'}
-                            className="rounded-full border border-[#069494]/40 bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#069494] transition hover:border-[#069494]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="rounded-full border border-[#C2885B]/40 bg-[#111216] px-2.5 py-1 text-[11px] font-medium text-[#C2885B] transition hover:border-[#C2885B]/40 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {recipientResolutionStatus === 'checking' ? 'Checking…' : 'Check'}
                           </button>
@@ -3553,7 +3687,7 @@ function App() {
                       </div>
 
                       {showContactPicker ? (
-                        <div className="mt-2 rounded-2xl border border-white/[0.06] bg-[#111216] p-2 shadow-[0_0_30px_rgba(0,0,0,0.25)]">
+                        <div className="mt-2 rounded-2xl border border-white/[0.06] bg-[#111216] p-2">
                           {contacts.length === 0 ? (
                             <div className="rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-3 text-xs text-[#A1A1AA]">
                               No saved contacts yet.
@@ -3571,9 +3705,9 @@ function App() {
                                     setShowContactPicker(false);
                                     validateSendRecipient(contact.address);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-left transition hover:border-[#069494]/40"
+                                  className="flex w-full items-center gap-2 rounded-xl border border-white/[0.06] bg-[#16171C] px-3 py-2 text-left transition hover:border-[#C2885B]/40"
                                 >
-                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#069494]/15 text-[10px] font-semibold text-[#069494]">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#C2885B]/15 text-[10px] font-semibold text-[#C2885B]">
                                     {formatContactLabel(contact)
                                       .split(/\s+/)
                                       .filter(Boolean)
@@ -3604,7 +3738,7 @@ function App() {
                         <button
                           type="button"
                           onClick={handleSaveCurrentContact}
-                          className="rounded-xl bg-[#069494] px-3 py-2 text-xs font-medium text-white"
+                          className="rounded-xl bg-[#C2885B] px-3 py-2 text-xs font-medium text-white"
                         >
                           Save
                         </button>
@@ -3622,11 +3756,20 @@ function App() {
                     ) : null}
 
                     {sendRecipientError ? <p className="mt-2 text-xs text-rose-500/70">{sendRecipientError}</p> : null}
-                    {recipientResolutionStatus === 'resolved' && resolvedSendAddress ? (
-                      <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-500/70">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Resolved to {resolvedSendAddress.slice(0, 6)}...{resolvedSendAddress.slice(-4)}
-                      </p>
+                    {recipientResolutionStatus === 'resolved' && resolvedArcHandle ? (
+                      <div className="mt-3 border-l-2 border-[#C2885B] pl-3">
+                        <p className="arc-reveal font-display text-[28px] leading-[1.15] tracking-[-0.03em] text-[#F5F3FF]">
+                          {resolvedArcHandle}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-[#71717A]">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-[#C2885B]" />
+                          <span className="tabular-nums">
+                            {resolvedSendAddress
+                              ? `${resolvedSendAddress.slice(0, 10)}…${resolvedSendAddress.slice(-6)}`
+                              : 'Resolved'}
+                          </span>
+                        </p>
+                      </div>
                     ) : null}
                     {recipientResolutionStatus === 'unsupported' ? (
                       <p className="mt-2 text-xs text-[#A1A1AA]">
@@ -3634,8 +3777,8 @@ function App() {
                       </p>
                     ) : null}
                     {isResolvingArcName ? (
-                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#069494]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#069494]">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#069494]" />
+                      <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#C2885B]/30 bg-[#0B0C11] px-3 py-1 text-[11px] text-[#C2885B]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#C2885B]" /> {/* taste-skill-ignore: live resolving status */}
                         Resolving ArcName handle…
                       </div>
                     ) : null}
@@ -3660,7 +3803,7 @@ function App() {
                           setSendAmountError('');
                         }}
                         disabled={txState === 'pending'}
-                        className="rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1 text-[11px] font-medium text-[#A1A1AA] transition-fast hover:border-[#069494]/30 hover:text-[#F5F3FF]"
+                        className="rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1 text-[11px] font-medium text-[#A1A1AA] transition-fast hover:border-[#C2885B]/30 hover:text-[#F5F3FF]"
                       >
                         Max
                       </button>
@@ -3679,7 +3822,7 @@ function App() {
                             setSendAmountError('');
                           }}
                           disabled={txState === 'pending'}
-                          className="flex-1 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-xs font-medium text-[#A1A1AA] transition-fast hover:border-[#069494]/30 hover:text-[#F5F3FF]"
+                          className="flex-1 rounded-full border border-white/[0.06] bg-[#16171C] px-2.5 py-1.5 text-xs font-medium text-[#A1A1AA] transition-fast hover:border-[#C2885B]/30 hover:text-[#F5F3FF]"
                         >
                           {percent}%
                         </button>
@@ -3691,7 +3834,7 @@ function App() {
                   <button
                     onClick={() => void handleSendReview()}
                     disabled={txState === 'pending' || isResolvingArcName}
-                    className="w-full rounded-2xl bg-[#069494] px-4 py-3 font-medium text-white transition hover:bg-[#058A8A] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="w-full rounded-2xl bg-[#C2885B] px-4 py-3 font-medium text-white transition hover:bg-[#C27750] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {txState === 'pending' ? 'Confirming…' : 'Confirm payment'}
                   </button>
@@ -3699,12 +3842,12 @@ function App() {
               )}
 
               {txState === 'confirming' && txHash ? (
-                <div className="rounded-2xl border border-[#069494]/40 bg-[#069494]/10 p-3 text-sm text-[#069494]">
+                <div className="rounded-2xl border border-[#C2885B]/40 bg-[#C2885B]/10 p-3 text-sm text-[#C2885B]">
                   <div className="flex items-center gap-2">
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     <p>{txConfirmationTimedOut ? 'Still confirming — check the explorer' : 'Confirming on-chain…'}</p>
                   </div>
-                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#069494]">
+                  <a href={`${EXPLORER_URL}/tx/${txHash}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 text-[#C2885B]">
                     View on explorer <ExternalLink className="h-4 w-4" />
                   </a>
                 </div>
@@ -3732,8 +3875,8 @@ function App() {
         </div>
       ) : null}
       {showSwap ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-white/[0.06] bg-[#111216] p-6 shadow-[0_0_60px_rgba(0,0,0,0.4)]">
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-[#08090D]/95 px-4">
+          <div className="w-full max-w-md rounded-xl surface-with-border p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold">Swap</h3>
               <button onClick={() => setShowSwap(false)} className="text-sm text-[#A1A1AA]">Close</button>
@@ -3751,34 +3894,31 @@ function App() {
         </div>
       ) : null}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-10 border-t border-white/[0.06] bg-[#08090D]/95 backdrop-blur-xl">
+      {/* Bottom Navigation — flat icon bar, no decorative FAB */}
+      <nav className="fixed bottom-0 left-0 right-0 z-10 pt-2 bg-[#08090D]/95 ">
         <div className="relative mx-auto flex h-[72px] max-w-md items-center justify-around">
           {/* Left: Contacts */}
           <button
             onClick={() => setShowContacts(true)}
-            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04]"
+            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
             aria-label="Contacts"
           >
             <Users className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
           </button>
 
-          {/* Center: Scan — primary action */}
+          {/* Center: Scan — same flat style as Contacts/Settings, no oversized copper circle */}
           <button
             onClick={() => setShowScanner(true)}
+            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
             aria-label="Scan QR code"
-            className="group relative -mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#069494] text-white shadow-scan transition-normal hover:bg-[#058A8A] hover:shadow-scan-hover active:scale-95"
           >
-            <ScanLine className="h-6 w-6" strokeWidth={2} />
-            {/* Subtle pulse ring on hover */}
-            <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#069494]/30 transition-normal group-hover:ring-[#069494]/50" />
+            <ScanLine className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" strokeWidth={2} />
           </button>
-
 
           {/* Right: Settings */}
           <button
             onClick={() => setShowSettings(true)}
-            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04]"
+            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
             aria-label="Settings"
           >
             <Settings className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />

@@ -82,3 +82,4 @@ pnpm-lock.yaml
 .claude
 skills-lock.json
 opencode.json
+.plans

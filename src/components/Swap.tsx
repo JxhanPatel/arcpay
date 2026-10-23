@@ -484,7 +484,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
   return (
     <div className="swap-modal">
       {/* --- Send Card --- */}
-      <div className="send-card mb-4 rounded-2xl border border-white/[0.06] bg-[#0B0C11] p-4">
+      <div className="send-card mb-4 rounded-2xl surface-with-border p-4">
         <span className="text-xs font-medium text-[#71717A] mb-3 block">Send</span>
 
         <div className="flex items-end gap-3">
@@ -495,7 +495,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
               placeholder="Amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full bg-transparent text-3xl font-display font-medium text-[#F5F3FF] placeholder:text-[#71717A] focus:outline-none"
+              className="w-full bg-transparent text-3xl font-display font-medium text-[#F5F3FF] placeholder:text-[#71717A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
             />
             {/* Percentage options */}
             <div className="grid grid-cols-4 gap-2 mt-2.5">
@@ -514,7 +514,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                     type="button"
                     onClick={() => setAmount(value)}
                     disabled={balanceNum <= 0}
-                    className="rounded-xl border border-white/[0.08] bg-[#16171C] px-2.5 py-1.5 text-[10px] font-medium text-[#E4E4E7] transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#1A1B21] hover:text-[#F5F3FF] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                    className="rounded-xl border border-white/[0.08] bg-[#16171C] px-2.5 py-1.5 text-[10px] font-medium text-[#E4E4E7] transition-all duration-200 hover:border-[#C2885B]/30 hover:bg-[#1A1B21] hover:text-[#F5F3FF] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
                   >
                     {label}
                   </button>
@@ -541,7 +541,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
           <div ref={fromDropdownRef} className="relative">
             <button
               type="button"
-              className="group flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#1A1B21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#069494]/40"
+              className="group flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 transition-all duration-200 hover:border-[#C2885B]/30 hover:bg-[#1A1B21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/40"
               onClick={() => setOpenDropdown(openDropdown === 'from' ? null : 'from')}
               aria-label={`From: ${fromToken}`}
               aria-haspopup="listbox"
@@ -550,10 +550,12 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
               <img
                 src={ASSET_ICON_URLS[fromToken]}
                 alt=""
+                width={24}
+                height={24}
                 className="h-6 w-6 rounded-full"
               />
               <span className="text-sm font-medium text-[#F5F3FF]">{fromToken}</span>
-              <ChevronDown className="h-3 w-3 text-[#069494] opacity-70" />
+              <ChevronDown className="h-3 w-3 text-[#C2885B] opacity-70" />
             </button>
 
             {/* Dropdown rendered via portal to avoid clipping */}
@@ -570,7 +572,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                     width: dropdownPositions.from?.width ?? 0,
                     minWidth: 240,
                   }}
-                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
+                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl surface-with-border p-1"
                 >
                   {assetOptions.map((option) => {
                     const isSelected = isFromSelected(option.symbol);
@@ -591,13 +593,15 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                         }}
                         disabled={!canSelect}
                         className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                          isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
+                          isSelected ? 'bg-[#C2885B]/10' : 'hover:bg-white/[0.04]'
                         } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <img
                           src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol]}
                           alt=""
-                          className="h-8 w-8 rounded-full shadow-sm"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 rounded-full"
                         />
                         <div className="min-w-0 flex-1">
                           <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
@@ -607,7 +611,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                             {formatBalance(option.balance ?? '0')} available
                           </span>
                         </div>
-                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
+                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#C2885B]" />}
                       </button>
                     );
                   })}
@@ -623,15 +627,15 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
       <div className="my-4 flex justify-center">
         <button
           onClick={handleTokenSwap}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] shadow-sm transition-all duration-200 hover:border-[#069494]/50 hover:bg-[#1A1B21] hover:scale-105 cursor-pointer"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-[#16171C] transition-all duration-200 hover:border-[#C2885B]/50 hover:bg-[#1A1B21] hover:scale-105 cursor-pointer"
           aria-label="Swap tokens"
         >
-          <ArrowUpDown className="h-5 w-5 text-[#069494]" />
+          <ArrowUpDown className="h-5 w-5 text-[#C2885B]" />
         </button>
       </div>
 
       {/* --- Receive Card --- */}
-      <div className="receive-card mb-4 rounded-2xl border border-white/[0.06] bg-[#0B0C11] p-4">
+      <div className="receive-card mb-4 rounded-2xl surface-with-border p-4">
         <span className="text-xs font-medium text-[#71717A] mb-3 block">Receive</span>
 
         <div className="flex items-end gap-3">
@@ -642,7 +646,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
               placeholder="0.0"
               value={quote?.outputAmount ?? ''}
               readOnly
-              className="w-full bg-transparent text-3xl font-display font-medium text-[#F5F3FF] placeholder:text-[#71717A] focus:outline-none"
+              className="w-full bg-transparent text-3xl font-display font-medium text-[#F5F3FF] placeholder:text-[#71717A] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
             />
             {/* Fiat value underneath */}
             <div className="mt-1 flex items-center gap-1 text-sm text-[#71717A]">
@@ -665,7 +669,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
           <div ref={toDropdownRef} className="relative">
             <button
               type="button"
-              className="group flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 transition-all duration-200 hover:border-[#069494]/30 hover:bg-[#1A1B21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#069494]/40"
+              className="group flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#16171C] px-3 py-2 transition-all duration-200 hover:border-[#C2885B]/30 hover:bg-[#1A1B21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/40"
               onClick={() => setOpenDropdown(openDropdown === 'to' ? null : 'to')}
               aria-label={`To: ${toToken}`}
               aria-haspopup="listbox"
@@ -674,10 +678,12 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
               <img
                 src={ASSET_ICON_URLS[toToken]}
                 alt=""
+                width={24}
+                height={24}
                 className="h-6 w-6 rounded-full"
               />
               <span className="text-sm font-medium text-[#F5F3FF]">{toToken}</span>
-              <ChevronDown className="h-3 w-3 text-[#069494] opacity-70" />
+              <ChevronDown className="h-3 w-3 text-[#C2885B] opacity-70" />
             </button>
 
             {/* Dropdown rendered via portal to avoid clipping */}
@@ -694,7 +700,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                     width: dropdownPositions.to?.width ?? 0,
                     minWidth: 240,
                   }}
-                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl border border-white/[0.08] bg-[#12141B]/95 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,0,0,0.5)] p-1"
+                  className="max-h-[90vh] sm:max-h-72 overflow-y-auto overflow-x-hidden rounded-xl surface-with-border p-1"
                 >
                   {assetOptions.map((option) => {
                     const isSelected = isToSelected(option.symbol);
@@ -715,13 +721,15 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                         }}
                         disabled={!canSelect}
                         className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-fast ${
-                          isSelected ? 'bg-[#069494]/10' : 'hover:bg-white/[0.04]'
+                          isSelected ? 'bg-[#C2885B]/10' : 'hover:bg-white/[0.04]'
                         } ${!canSelect ? 'opacity-60 cursor-not-allowed' : ''}`}
                       >
                         <img
                           src={ASSET_ICON_URLS[option.key] ?? ASSET_ICON_URLS[option.symbol]}
                           alt=""
-                          className="h-8 w-8 rounded-full shadow-sm"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 rounded-full"
                         />
                         <div className="min-w-0 flex-1">
                           <span className={`block text-sm font-medium truncate ${isZero ? 'text-[#71717A]' : 'text-[#F5F3FF]'}`}>
@@ -731,7 +739,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
                             {formatBalance(option.balance ?? '0')} available
                           </span>
                         </div>
-                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#069494]" />}
+                        {isSelected && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#C2885B]" />}
                       </button>
                     );
                   })}
@@ -764,7 +772,7 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
           className={`w-full rounded-2xl px-4 py-3 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${
             swapStatus === 'processing'
               ? 'bg-amber-500/90 hover:bg-amber-500'
-              : 'bg-[#069494] hover:bg-[#058A8A]'
+              : 'bg-[#C2885B] hover:bg-[#C27750]'
           }`}
         >
           {swapStatus === 'processing' ? (
@@ -828,11 +836,11 @@ export const Swap = memo(function Swap({ provider, wallet, assetBalances, tokenA
               )}
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
+          <div className="mt-3 flex items-center justify-between text-sm pt-3">
             <span className="text-[#71717A]">Exchange Rate</span>
             <span className="font-medium text-[#F5F3FF]">1 {fromToken} ≈ {quote.rate} {toToken}</span>
           </div>
-          <div className="mt-3 flex items-center justify-between text-sm border-t border-white/[0.06] pt-3">
+          <div className="mt-3 flex items-center justify-between text-sm pt-3">
             <span className="text-[#71717A]">Estimated Output</span>
             <div className="text-right">
               <span className="font-medium text-[#F5F3FF]">{quote.outputAmount} {toToken}</span>

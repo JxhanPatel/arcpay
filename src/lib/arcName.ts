@@ -9,10 +9,50 @@ const ARCNAME_PROTOCOL_REGISTRY_ADDRESS = '0x00000000000000000000000000000000000
 const ARCNAME_REGISTRY_ABI = [
   'function resolve(string identifier) view returns (address)',
   'function getAddress(string identifier) view returns (address)',
+  'function getPrimaryAddress(address account) view returns (address)',
 ];
 
 const getLiveRegistryResolver = (provider: ethers.Provider) => {
   return new ethers.Contract(ARCNAME_PROTOCOL_REGISTRY_ADDRESS, ARCNAME_REGISTRY_ABI, provider);
+};
+
+// Reverse ArcName lookup: attempt to resolve an .arc handle from an address.
+// Tries the fallback registry first, then the live registry's getPrimaryAddress or reverse.
+export const resolveArcNameReverse = async (address: string, provider: ethers.Provider): Promise<string | null> => {
+  const checksum = ethers.getAddress(address);
+
+  // 1. Check fallback registry reverse lookup
+  // Map of handle -> address; we look for the address value that matches
+  const fallbackHandle = Object.entries(ARCNAME_FALLBACK_LOOKUP).find(
+    ([, addr]) => ethers.getAddress(addr) === checksum,
+  );
+  if (fallbackHandle) {
+    return fallbackHandle[0];
+  }
+
+  // 2. Try live registry reverse via getPrimaryAddress if the ABI supports it
+  try {
+    const registry = getLiveRegistryResolver(provider);
+    try {
+      const primaryAddress: string = await registry.getPrimaryAddress(checksum);
+      if (primaryAddress && primaryAddress !== '0x0000000000000000000000000000000000000000') {
+        // Look up the handle that maps to this primary address
+        const handle = Object.entries(ARCNAME_FALLBACK_LOOKUP).find(
+          ([, a]) => ethers.getAddress(a) === primaryAddress,
+        );
+        if (handle) {
+          return handle[0];
+        }
+      }
+    } catch {
+      // getPrimaryAddress not supported, continue
+    }
+  } catch {
+    // Live registry unavailable, fall through
+  }
+
+  // 3. If there's a fallback but no reverse, return null
+  return null;
 };
 
 export const resolveArcName = async (identifier: string, provider: ethers.Provider): Promise<string> => {
