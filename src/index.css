@@ -116,8 +116,8 @@
 
   /* Type scale (Phase 1 tokens) — editorial authority, larger than default */
   :root {
-    --type-display: clamp(56px, 7.5vw, 96px);
-    --type-heading: clamp(28px, 3.75vw, 36px);
+    --type-display: clamp(40px, 7.5vw, 70px);
+    --type-heading: clamp(20px, 3.75vw, 18px);
     --type-body: 17px;
     --type-small: 13px;
     --type-micro: 11px;

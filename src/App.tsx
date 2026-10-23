@@ -2561,7 +2561,10 @@ function App() {
               </h2>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-small text-[#5C565A] hidden sm:inline">Arc Testnet · Active</span>
+              <div className="inline-flex items-center gap-2 hidden sm:inline-flex">
+                <span className="text-xs text-[#A1A1AA] font-medium">Arc Testnet</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
+              </div>
               <button
                 onClick={() => void refreshWalletData()}
                 className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-[#0F1115] transition-fast hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.08]"
