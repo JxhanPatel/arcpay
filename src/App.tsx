@@ -1296,15 +1296,34 @@ function App() {
     }
   };
 
-  // Handle import wallet with PIN
-  const handleImportWallet = async () => {
+// Fixed test seed phrase used by the "Try with a test wallet" button.
+  const TEST_WALLET_SEED =
+    'invest parade outside vanish twice wood picnic abandon jump rocket globe car';
+
+  // Fill the import field with the test seed phrase (only when empty so we
+  // never silently overwrite user-typed content) and trigger import. The
+  // phrase is passed explicitly to avoid a stale-state race: React batches
+  // the setState call, so reading importInput inside handleImportWallet
+  // would still be empty on the first click.
+  const handleTryTestWallet = () => {
+    if (!importInput.trim()) {
+      setImportInput(TEST_WALLET_SEED);
+    }
+    void handleImportWallet(TEST_WALLET_SEED);
+  };
+
+  // Handle import wallet with PIN. Accepts an optional `input` override so
+  // callers can supply a value directly (avoids reading state before a
+  // pending setState has flushed).
+  const handleImportWallet = async (input?: string) => {
+    const value = input ?? importInput;
     try {
       setIsLoading(true);
       setError(null);
-      if (!isValidPrivateKey(importInput)) {
+      if (!isValidPrivateKey(value)) {
         throw new Error('Enter a valid 12-word seed phrase or a raw private key.');
       }
-      const imported = parseWalletInput(importInput).connect(provider);
+      const imported = parseWalletInput(value).connect(provider);
       const privateKeyValue = imported.privateKey;
 
       const importedMnemonic = (imported as { mnemonic?: { phrase?: string } }).mnemonic?.phrase;
@@ -2390,14 +2409,24 @@ function App() {
     return (
       <div className="min-h-screen bg-[#08090D] text-[#F5F3FF] flex items-center justify-center px-4 py-10">
         <div className="relative w-full max-w-md rounded-xl surface-with-border p-8">
-          <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C2885B]/[0.10]">
-              <Wallet className="h-5 w-5 text-[#C2885B]" />
+          <div className="mb-8 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C2885B]/[0.10]">
+                <Wallet className="h-5 w-5 text-[#C2885B]" />
+              </div>
+              <div>
+                <p className="subhead text-[#71717A]">Self-custodial</p>
+                <h1 className="text-heading font-display font-bold text-[#F5F3FF]">Arc Wallet</h1>
+              </div>
             </div>
-            <div>
-              <p className="subhead text-[#71717A]">Self-custodial</p>
-              <h1 className="text-heading font-display font-bold text-[#F5F3FF]">Arc Wallet</h1>
-            </div>
+            <button
+              onClick={handleTryTestWallet}
+              disabled={isLoading || isProcessing}
+              className="group flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#0F1115] px-4 py-3.5 text-sm font-medium text-[#F5F3FF] transition-fast hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/30 focus-visible:ring-offset-2 min-h-[44px] min-w-[44px]"
+              aria-label="Try with a test wallet"
+            >
+              <span className="text-sm">Try with a test wallet</span>
+            </button>
           </div>
 
           <div className="mb-6 space-y-2">
