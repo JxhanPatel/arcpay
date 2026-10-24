@@ -2450,12 +2450,12 @@ function App() {
         <header className="flex items-center justify-between py-1.5 px-2">
           <div className="flex items-center gap-2.5">
             <img src={logoUrl} alt="ArcPay" width={36} height={36} className="h-9 w-9 object-contain" />
-            <div className="flex flex-col leading-tight hidden sm:flex">
-              <span className="text-heading font-display font-bold text-[#F5F3FF]">ArcPay</span>
+            <div className="flex flex-col leading-tight flex">
+              <span className="text-heading font-display font-bold text-[#F5F3FF] text-base sm:text-heading">ArcPay</span>
               <button
                 type="button"
                 onClick={() => setShowAccountMenu((prev) => !prev)}
-                className="subhead text-[#71717A] hover:text-[#A1A1AA] transition-colors"
+                className="subhead text-[#71717A] hover:text-[#A1A1AA] transition-colors text-[11px] sm:text-xs truncate max-w-[120px]"
                 aria-expanded={showAccountMenu}
                 aria-label="Select account"
               >
@@ -2561,7 +2561,7 @@ function App() {
               </h2>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <div className="inline-flex items-center gap-2 hidden sm:inline-flex">
+              <div className="inline-flex items-center gap-2">
                 <span className="text-xs text-[#A1A1AA] font-medium">Arc Testnet</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
               </div>
@@ -2578,9 +2578,9 @@ function App() {
 
         {/* Quick Actions — Pill Action Dock */}
         <nav aria-label="Wallet actions" className="px-2">
-          <div className="flex items-center justify-center gap-2.5 flex-wrap">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-center sm:gap-2.5">
             {[
-              { label: 'Send', icon: Send, action: () => openSendModal() },
+              { label: 'Send', icon: Send, action: () => openSendModal(), primary: true },
               { label: 'Receive', icon: QrCode, action: () => setShowReceive(true) },
               { label: 'Request', icon: ArrowUpRight, action: openRequestModal },
               { label: 'Swap', icon: ArrowLeftRight, action: () => setShowSwap(true) },
@@ -2589,7 +2589,11 @@ function App() {
                 key={item.label}
                 type="button"
                 onClick={item.action}
-                className="press-effect border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] transition-all rounded-xl py-3 px-4 flex items-center gap-2 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+                className="press-effect transition-all rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] ${
+                  item.primary
+                    ? 'bg-[#C2885B] border-[#C2885B]'
+                    : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.06]'
+                }"
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
@@ -2654,7 +2658,7 @@ function App() {
               <h3 className="text-sm font-semibold text-[#F5F3FF]">Recent Activity</h3>
               <button
                 onClick={() => setShowHistory(true)}
-                className="text-xs text-[#8B5CF6] hover:text-[#A166FF] transition-colors"
+                className="text-xs text-[#C2885B] hover:text-[#A166FF] transition-colors"
               >
                 See All →
               </button>
