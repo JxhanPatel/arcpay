@@ -3913,13 +3913,13 @@ function App() {
             <Users className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" />
           </button>
 
-          {/* Center: Scan — same flat style as Contacts/Settings, no oversized copper circle */}
+          {/* Center: Scan — primary action, filled copper accent for distinction */}
           <button
             onClick={() => setShowScanner(true)}
-            className="group flex h-11 w-11 items-center justify-center rounded-full transition-fast hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D]"
+            className="group flex h-14 w-14 items-center justify-center rounded-full bg-[#C2885B] shadow-none transition-fast hover:bg-[#C27750] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] press-effect"
             aria-label="Scan QR code"
           >
-            <ScanLine className="h-5 w-5 text-[#71717A] transition-fast group-hover:text-[#A1A1AA]" strokeWidth={2} />
+            <ScanLine className="h-6 w-6 text-white transition-fast" strokeWidth={2} />
           </button>
 
           {/* Right: Settings */}
