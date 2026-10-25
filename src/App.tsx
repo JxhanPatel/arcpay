@@ -349,8 +349,12 @@ const isValidPrivateKey = (input: string) => {
   const normalized = input.trim();
   if (!normalized) return false;
   if (/^0x[0-9a-fA-F]{64}$/.test(normalized)) return true;
+  
   const parts = normalized.split(/\s+/);
-  return parts.length === 12 && parts.every((part) => part.length > 0);
+  const validLengths = [12, 15, 18, 21, 24];
+  const isValidWordCount = validLengths.includes(parts.length);
+  
+  return isValidWordCount && parts.every((part) => part.length > 0);
 };
 
 type ArcWallet = (ethers.Wallet & { mnemonic?: { phrase: string } }) | ethers.HDNodeWallet;
@@ -631,11 +635,12 @@ const parseWalletInput = (input: string): ArcWallet => {
   }
 
   const words = normalized.split(/\s+/);
-  if (words.length === 12) {
+  const validLengths = [12, 15, 18, 21, 24];
+  if (validLengths.includes(words.length)) {
     return ethers.Wallet.fromPhrase(normalized);
   }
 
-  throw new Error('Enter a valid 12-word seed phrase or a raw private key.');
+  throw new Error('Enter a valid 12/15/18/21/24-word seed phrase or a raw private key.');
 };
 
 // Numeric passcode pad used for unlock / create / confirm screens.
@@ -1321,7 +1326,7 @@ function App() {
       setIsLoading(true);
       setError(null);
       if (!isValidPrivateKey(value)) {
-        throw new Error('Enter a valid 12-word seed phrase or a raw private key.');
+        throw new Error('Enter a valid 12/15/18/21/24-word seed phrase or a raw private key.');
       }
       const imported = parseWalletInput(value).connect(provider);
       const privateKeyValue = imported.privateKey;
@@ -2450,7 +2455,7 @@ function App() {
                 value={importInput}
                 onChange={(e) => setImportInput(e.target.value)}
                 rows={4}
-                placeholder="12-word seed phrase or 0x private key"
+                placeholder="12/15/18/21/24-word seed phrase or 0x private key"
                 className="w-full rounded-xl border border-white/[0.06] bg-[#08090D] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] transition-fast"
               />
               <button
