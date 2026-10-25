@@ -139,6 +139,67 @@ export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) 
     };
   }
 
+  // For swap transactions with multiple token_transfers, inspect all transfers
+  // to identify input (outgoing) and output (incoming) tokens.
+  const hasMultipleTransfers = tokenTransfers.length > 1;
+
+  if (hasMultipleTransfers) {
+    // Find USDC and EURC transfers among all transfers
+    const usdcTransfer = tokenTransfers.find(
+      (t) => isObjectRecord(t.token) && String(t.token?.symbol ?? '').toUpperCase() === 'USDC',
+    );
+    const eurcTransfer = tokenTransfers.find(
+      (t) => isObjectRecord(t.token) && String(t.token?.symbol ?? '').toUpperCase() === 'EURC',
+    );
+
+    let inputSymbol = 'USDC';
+    let outputSymbol = 'EURC';
+    let inputValue = '0';
+    let outputValue = '0';
+
+    const extractValue = (t: Record<string, unknown>, fallbackKey = 'value'): string => {
+      const totalObj = isObjectRecord(t.total) ? t.total as Record<string, unknown> : null;
+      if (totalObj && totalObj.value !== undefined && totalObj.value !== null) {
+        return String(totalObj.value);
+      }
+      if (t.value !== undefined && t.value !== null) {
+        return String(t.value);
+      }
+      return '0';
+    };
+
+    if (usdcTransfer && eurcTransfer) {
+      // In a swap: USDC goes out (input/negative), EURC comes in (output/positive)
+      inputSymbol = 'USDC';
+      outputSymbol = 'EURC';
+      inputValue = extractValue(usdcTransfer);
+      outputValue = extractValue(eurcTransfer);
+    } else if (usdcTransfer) {
+      // Only USDC transfer — treat as sent
+      inputSymbol = 'USDC';
+      inputValue = extractValue(usdcTransfer);
+    } else if (eurcTransfer) {
+      // Only EURC transfer — treat as received
+      outputSymbol = 'EURC';
+      outputValue = extractValue(eurcTransfer);
+    }
+
+    const rawValue = toBigInt(inputValue);
+    const inputRawValue = toBigInt(inputValue);
+    const outputRawValue = toBigInt(outputValue);
+    const sixDecimals = 6;
+
+    return {
+      symbol: inputSymbol,
+      decimals: sixDecimals,
+      rawValue,
+      inputSymbol,
+      outputSymbol,
+      inputValue: formatTokenBalance(inputRawValue, sixDecimals),
+      outputValue: formatTokenBalance(outputRawValue, sixDecimals),
+    };
+  }
+
   const transferSymbol = String(
     transferToken?.symbol
       ?? firstTransfer?.symbol
@@ -170,6 +231,11 @@ export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) 
   );
   const rawValue = toBigInt(transferValue);
   const normalizedAmount = Number(formatTokenBalance(rawValue, Number.isFinite(transferDecimals) ? transferDecimals : getAssetDecimals(transferSymbol)));
+
+  // Temporary debug assertion: flag suspicious zero-amount swaps for debugging
+  if (normalizedAmount === 0 && rawValue > 0n) {
+    console.warn('[arcpay:swap-debug] suspicious zero-amount swap', { symbol: transferSymbol, rawValue: String(rawValue) });
+  }
 
   if (Number.isFinite(normalizedAmount) && Math.abs(normalizedAmount) > 1_000_000) {
     console.warn('[arcpay:tx-display-meta] suspicious amount detected', {

@@ -518,6 +518,8 @@ const fetchTransactionDetail = async (hash: string) => {
 
 // Group swap-related transactions into a single combined row at the data layer.
 // Pair by router address + proximity (within 5 min) + opposite token directions.
+// Single-swap transactions already carry input/output fields from the explorer
+// (multi-transfer payloads); only pair separate legs when both fields are absent.
 const groupSwapPairs = (items: TransactionHistoryItem[]): TransactionHistoryItem[] => {
   const routerAddresses = new Set([
     '0xe27d5d256b370604f1ff060fb489c6a8e3f8a6d9',
@@ -535,19 +537,31 @@ const groupSwapPairs = (items: TransactionHistoryItem[]): TransactionHistoryItem
       continue;
     }
 
+    // If this single transaction already has both input and output symbols
+    // (multi-transfer swap payload), it's a complete swap — no pairing needed.
+    if (a.inputSymbol && a.outputSymbol && a.inputValue && a.outputValue) {
+      grouped.push(a);
+      used.add(a.hash);
+      continue;
+    }
+
     // Look for a partner swap/transfer with same router and nearby timestamp
     for (let j = i + 1; j < items.length; j++) {
       const b = items[j];
       if (used.has(b.hash)) continue;
       if (Math.abs(a.timestamp - b.timestamp) > 5 * 60 * 1000) break; // 5 min window
 
-      const bothSwapLike = a.type === 'swap' || b.type === 'swap';
       const sameRouter = routerAddresses.has(String(a.to ?? '').toLowerCase()) || routerAddresses.has(String(b.to ?? '').toLowerCase());
+      const aSymbol = String(a.tokenSymbol ?? '').toUpperCase();
+      const bSymbol = String(b.tokenSymbol ?? '').toUpperCase();
+      const oppositeSymbols = (aSymbol === 'USDC' && bSymbol === 'EURC') || (aSymbol === 'EURC' && bSymbol === 'USDC');
+      const oppositeDirection = (a.direction === 'sent' && b.direction === 'received') || (a.direction === 'received' && b.direction === 'sent');
 
-      if (bothSwapLike || sameRouter) {
-        // Build combined item from the pair
-        const inputItem = a.tokenSymbol === 'USDC' ? a : b;
-        const outputItem = a.tokenSymbol === 'EURC' ? a : b;
+      // Pair only if: same router AND opposite symbols (USDC vs EURC) AND opposite directions
+      if (sameRouter && oppositeSymbols && oppositeDirection) {
+        // Build combined item from the pair with strict input/output selection
+        const inputItem = aSymbol === 'USDC' ? a : b;
+        const outputItem = bSymbol === 'EURC' ? b : a;
         const combined: TransactionHistoryItem = {
           hash: a.hash,
           from: a.from,
@@ -618,10 +632,15 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
       const tokenTransfers = Array.isArray(item.token_transfers)
         ? item.token_transfers.filter(isObjectRecord)
         : [];
-      const detailItem = hasTokenTransferType && tokenTransfers.length === 0 && hash
+      // When a swap leg has only one transfer listed but it's a token_transfer,
+      // the explorer detail may carry the full multi-transfer payload (USDC out + EURC in).
+      const detailItem = hasTokenTransferType && hash
         ? await fetchTransactionDetail(hash)
         : null;
       const sourceItem = detailItem && isPlainObject(detailItem) ? detailItem : item;
+      const sourceTokenTransfers = Array.isArray(sourceItem.token_transfers)
+        ? sourceItem.token_transfers.filter(isObjectRecord)
+        : [];
 
       const txFrom = String(
         (sourceItem.from as { address_hash?: string; hash?: string } | undefined)?.address_hash
@@ -654,7 +673,7 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
       }
 
       const direction = parseTransactionDirection(normalizedAddress, txFrom, txTo);
-      const isSwap = hasTokenTransferType && tokenTransfers.length > 0;
+      const isSwap = hasTokenTransferType && sourceTokenTransfers.length > 0;
 
       return {
         hash,
@@ -663,6 +682,10 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
         value: formatTokenBalance(displayMeta.rawValue, displayMeta.decimals),
         tokenSymbol: displayMeta.symbol,
         decimals: displayMeta.decimals,
+        inputSymbol: displayMeta.inputSymbol,
+        outputSymbol: displayMeta.outputSymbol,
+        inputValue: displayMeta.inputValue,
+        outputValue: displayMeta.outputValue,
         timestamp: Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now(),
         direction,
         type: isSwap ? 'swap' : 'transfer',
@@ -3046,7 +3069,7 @@ function App() {
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const isSwap = transaction.type === 'swap';
-                    const hasCombinedSwap = isSwap && transaction.inputSymbol && transaction.outputSymbol;
+                    const hasCombinedSwap = isSwap && transaction.inputSymbol && transaction.outputSymbol && transaction.inputValue && transaction.outputValue;
                     const directionIcon = isSwap ? (
                       <ArrowUpDown className="h-4 w-4 text-[#C2885B]" />
                     ) : transaction.direction === 'received' ? (
