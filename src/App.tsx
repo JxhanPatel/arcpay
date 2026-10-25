@@ -2454,7 +2454,7 @@ function App() {
                 className="w-full rounded-xl border border-white/[0.06] bg-[#08090D] px-3 py-2.5 text-sm text-[#F5F3FF] outline-none ring-0 placeholder:text-[#71717A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C2885B]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08090D] transition-fast"
               />
               <button
-                onClick={handleImportWallet}
+                onClick={() => handleImportWallet()}
                 disabled={isLoading || isProcessing}
                 className="press-effect mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-white/[0.06] bg-[#0F1115] px-4 py-3 text-sm font-medium text-[#F5F3FF] transition-normal hover:border-[#C2885B]/40 hover:bg-[#C2885B]/[0.06]"
               >
