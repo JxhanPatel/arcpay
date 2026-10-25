@@ -304,17 +304,26 @@ export const createOptimisticSendUpdate = (input: {
 
 // Flips an unreconciled optimistic ('confirming') history item to its final
 // state once the chain/explorer reports a definitive outcome for its hash.
+// For combined swap items, match against any hash in the `hashes` array.
 export const reconcileOptimisticTransaction = (
   transactions: TransactionHistoryItem[],
   hash: string,
   status: 'ok' | 'error',
 ): TransactionHistoryItem[] => {
   const normalizedHash = String(hash ?? '').toLowerCase();
-  return transactions.map((transaction) =>
-    transaction.status === 'confirming' && String(transaction.hash).toLowerCase() === normalizedHash
-      ? { ...transaction, status }
-      : transaction,
-  );
+  return transactions.map((transaction) => {
+    if (transaction.status !== 'confirming') {
+      return transaction;
+    }
+    const ownHash = String(transaction.hash).toLowerCase();
+    const hashesMatch = Array.isArray(transaction.hashes)
+      ? transaction.hashes.some((h) => String(h).toLowerCase() === normalizedHash)
+      : false;
+    if (ownHash === normalizedHash || hashesMatch) {
+      return { ...transaction, status };
+    }
+    return transaction;
+  });
 };
 
 // Merges a freshly fetched explorer page into the current list without ever
@@ -329,6 +338,14 @@ export const mergeFetchedTransactions = (
   fetched: TransactionHistoryItem[],
 ): TransactionHistoryItem[] => {
   const seenHashes = new Set(fetched.map((transaction) => String(transaction.hash).toLowerCase()));
+  // Combined swap items carry every underlying hash in `hashes` — exclude them too
+  for (const transaction of fetched) {
+    if (Array.isArray(transaction.hashes)) {
+      for (const h of transaction.hashes) {
+        seenHashes.add(String(h).toLowerCase());
+      }
+    }
+  }
   const retained: TransactionHistoryItem[] = [];
   for (const transaction of current) {
     const normalizedHash = String(transaction.hash).toLowerCase();
@@ -381,6 +398,13 @@ export type TransactionHistoryItem = {
   direction: 'sent' | 'received';
   type?: 'swap' | 'transfer';
   status: 'ok' | 'pending' | 'error' | 'confirming';
+  // Combined swap fields (populated by groupSwapPairs)
+  inputSymbol?: string;      // e.g. 'USDC'
+  inputValue?: string;       // e.g. '1.00'
+  outputSymbol?: string;     // e.g. 'EURC'
+  outputValue?: string;      // e.g. '6.54'
+  feeValue?: string;         // e.g. '0.001'
+  hashes?: string[];         // both underlying hashes (approve + swap)
 };
 
 const toBigInt = (value: unknown) => {
@@ -492,6 +516,72 @@ const fetchTransactionDetail = async (hash: string) => {
   return detailResponse.json() as Promise<Record<string, unknown> | null>;
 };
 
+// Group swap-related transactions into a single combined row at the data layer.
+// Pair by router address + proximity (within 5 min) + opposite token directions.
+const groupSwapPairs = (items: TransactionHistoryItem[]): TransactionHistoryItem[] => {
+  const routerAddresses = new Set([
+    '0xe27d5d256b370604f1ff060fb489c6a8e3f8a6d9',
+    '0xE27d5d256b370604f1ff060fb489c6a8e3f8a6d9'.toLowerCase(),
+  ]);
+  const grouped: TransactionHistoryItem[] = [];
+  const used = new Set<string>();
+
+  for (let i = 0; i < items.length; i++) {
+    const a = items[i];
+    if (used.has(a.hash)) continue;
+    if (a.type !== 'swap' && a.tokenSymbol !== 'USDC' && a.tokenSymbol !== 'EURC') {
+      grouped.push(a);
+      used.add(a.hash);
+      continue;
+    }
+
+    // Look for a partner swap/transfer with same router and nearby timestamp
+    for (let j = i + 1; j < items.length; j++) {
+      const b = items[j];
+      if (used.has(b.hash)) continue;
+      if (Math.abs(a.timestamp - b.timestamp) > 5 * 60 * 1000) break; // 5 min window
+
+      const bothSwapLike = a.type === 'swap' || b.type === 'swap';
+      const sameRouter = routerAddresses.has(String(a.to ?? '').toLowerCase()) || routerAddresses.has(String(b.to ?? '').toLowerCase());
+
+      if (bothSwapLike || sameRouter) {
+        // Build combined item from the pair
+        const inputItem = a.tokenSymbol === 'USDC' ? a : b;
+        const outputItem = a.tokenSymbol === 'EURC' ? a : b;
+        const combined: TransactionHistoryItem = {
+          hash: a.hash,
+          from: a.from,
+          to: a.to,
+          value: inputItem.value,
+          tokenSymbol: inputItem.tokenSymbol,
+          decimals: inputItem.decimals,
+          timestamp: Math.min(a.timestamp, b.timestamp),
+          direction: a.direction,
+          type: 'swap',
+          status: a.status === 'ok' && b.status === 'ok' ? 'ok' : (a.status === 'error' || b.status === 'error') ? 'error' : 'pending',
+          inputSymbol: inputItem.tokenSymbol ?? 'USDC',
+          inputValue: inputItem.value,
+          outputSymbol: outputItem.tokenSymbol ?? 'EURC',
+          outputValue: outputItem.value,
+          feeValue: '0.00',
+          hashes: [a.hash, b.hash],
+        };
+        grouped.push(combined);
+        used.add(a.hash);
+        used.add(b.hash);
+        break;
+      }
+    }
+
+    if (!used.has(a.hash)) {
+      grouped.push(a);
+      used.add(a.hash);
+    }
+  }
+
+  return grouped;
+};
+
 export const fetchTransactionHistory = async (address: string): Promise<TransactionHistoryItem[]> => {
   const normalizedAddress = String(address ?? '').trim();
   if (!normalizedAddress) {
@@ -581,10 +671,13 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
     }),
   );
 
-  return normalizedCandidates
+  // Filter, sort, then group swap pairs at the data layer
+  const sortedItems = normalizedCandidates
     .filter((value): value is TransactionHistoryItem => value !== null)
-    .sort((left, right) => (right?.timestamp ?? 0) - (left?.timestamp ?? 0))
-    .slice(0, 50);
+    .sort((left, right) => (right?.timestamp ?? 0) - (left?.timestamp ?? 0));
+
+  const groupedItems = groupSwapPairs(sortedItems);
+  return groupedItems.slice(0, 50);
 };
 
 export const parseScanPayload = (rawInput: string): ScanPayload | null => {
@@ -2953,8 +3046,9 @@ function App() {
                     const tokenDisplay = formatDisplayBalance(transaction.value);
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const isSwap = transaction.type === 'swap';
+                    const hasCombinedSwap = isSwap && transaction.inputSymbol && transaction.outputSymbol;
                     const directionIcon = isSwap ? (
-                      <ArrowUpDown className="h-4 w-4 text-[#A1A1AA]" />
+                      <ArrowUpDown className="h-4 w-4 text-[#C2885B]" />
                     ) : transaction.direction === 'received' ? (
                       <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
                     ) : (
@@ -2962,38 +3056,72 @@ function App() {
                     );
 
                     return (
-                      <div 
-                        key={transaction.hash} 
-                        className={`py-4 border-b-0 transition-colors duration-180 hover:bg-white/[0.025] ${isSwap ? 'bg-[#16171C]/5 border-[#16171C]/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
+                      <a
+                        key={transaction.hash}
+                        href={`${EXPLORER_URL}/tx/${transaction.hash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`block py-4 border-b-0 transition-colors duration-180 hover:bg-white/[0.025] cursor-pointer ${isSwap ? 'bg-[#16171C]/5 border-[#16171C]/20' : ''} ${transaction.status === 'error' ? 'opacity-50' : ''}`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1B1D26] border border-white/[0.07]">
                               {directionIcon}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium text-[#F4F4F5] truncate">{transaction.direction === 'received' ? 'Received' : 'Sent'}</p>
-                              <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
-                               {isSwap ? <p className="inline-block text-xs mt-1 ml-2 bg-[#C2885B]/10 text-[#C2885B] rounded border-[#C2885B]/20 px-1.5 py-0.5">Swap</p> : null}
+                              <p className="font-medium text-[#F4F4F5] truncate">
+                                {hasCombinedSwap ? 'Swap' : (transaction.direction === 'received' ? 'Received' : 'Sent')}
+                              </p>
+                              {hasCombinedSwap ? (
+                                <p className="text-sm text-[#A1A1AA] truncate">
+                                  {transaction.inputSymbol} → {transaction.outputSymbol}
+                                </p>
+                              ) : (
+                                <p className="text-sm text-[#A1A1AA] truncate">{truncateAddress(counterparty)}</p>
+                              )}
+                              {isSwap ? (
+                                <p className="inline-block text-xs mt-1 ml-2 bg-[#C2885B]/10 text-[#C2885B] rounded border-[#C2885B]/20 px-1.5 py-0.5">Router</p>
+                              ) : null}
                               <p className="text-xs text-[#71717A]">{formatTimestamp(transaction.timestamp)}</p>
                             </div>
                           </div>
-                          <div className="text-right pl-2">
-                            <p className={`font-semibold ${isSwap ? 'text-[#A1A1AA]' : transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
-                              {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
-                            </p>
-                            <span className={`inline-block text-xs mt-1 ${
-                              transaction.status === 'ok' 
-                                ? 'text-emerald-500' 
-                                : transaction.status === 'error'
-                                  ? 'text-red-400'
-                                  : 'text-[#71717A]'
-                            }`}>
-                              {transaction.status === 'ok' ? 'OK' : statusDisplay.label}
-                            </span>
+                          <div className="text-right pl-2 shrink-0 flex flex-col items-end justify-between">
+                            <div>
+                              {hasCombinedSwap ? (
+                                <>
+                                  <p className="font-semibold text-[#F4F4F5] font-variant-numeric-tabular">
+                                    -{transaction.inputValue} {transaction.inputSymbol}
+                                  </p>
+                                  <p className="font-medium text-[#A1A1AA] font-variant-numeric-tabular">
+                                    +{transaction.outputValue} {transaction.outputSymbol}
+                                  </p>
+                                  {transaction.feeValue && transaction.feeValue !== '0' && (
+                                    <p className="text-[11px] text-[#71717A] mt-0.5">
+                                      Fee: {transaction.feeValue} {transaction.inputSymbol}
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                <p className={`font-semibold ${transaction.direction === 'sent' ? 'text-rose-400' : 'text-emerald-400'} font-variant-numeric-tabular`}>
+                                  {transaction.direction === 'sent' ? '-' : '+'}{tokenDisplay} {transaction.tokenSymbol}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`inline-block text-xs ${
+                                transaction.status === 'ok'
+                                  ? 'text-emerald-500'
+                                  : transaction.status === 'error'
+                                    ? 'text-red-400'
+                                    : 'text-[#71717A]'
+                              }`}>
+                                {transaction.status === 'ok' ? 'OK' : statusDisplay.label}
+                              </span>
+                              <ExternalLink className="h-3.5 w-3.5 text-[#71717A] opacity-60 group-hover:opacity-100 transition-opacity" />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </a>
                     );
                   })}
                 </div>
