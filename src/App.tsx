@@ -2849,32 +2849,66 @@ function App() {
             </div>
             <div className="space-y-1.5">
               {transactions.slice(0, 2).map((transaction) => {
+                const isSwap = transaction.type === 'swap';
+                const hasCombinedSwap = isSwap && transaction.inputSymbol && transaction.outputSymbol && transaction.inputValue && transaction.outputValue;
                 const isIncoming = transaction.direction === 'received';
                 const counterparty = isIncoming ? transaction.from : transaction.to;
                 const tokenDisplay = formatDisplayBalance(transaction.value);
-                const StatusIcon = isIncoming ? ArrowDownLeft : ArrowUpRight;
-                const statusColor = isIncoming ? 'text-emerald-500' : 'text-rose-500';
-                const actionText = isIncoming ? 'Received' : 'Sent';
+                const StatusIcon = hasCombinedSwap ? ArrowUpDown : (isIncoming ? ArrowDownLeft : ArrowUpRight);
+                const statusColor = hasCombinedSwap ? 'text-[#C2885B]' : (isIncoming ? 'text-emerald-500' : 'text-rose-500');
+                const actionText = hasCombinedSwap ? 'Swap' : (isIncoming ? 'Received' : 'Sent');
                 const preposition = isIncoming ? 'from' : 'to';
 
                 return (
                   <div
                     key={transaction.hash}
-                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.025] transition-colors duration-180"
+                    className={`flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.025] transition-colors duration-180 ${hasCombinedSwap ? 'bg-[#16171C]/5' : ''}`}
                   >
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.03] ${statusColor} bg-opacity-10`}>
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.03] ${statusColor}`}>
                       <StatusIcon className={`h-4 w-4 ${statusColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-[#F5F3FF] truncate">
-                        {actionText} {transaction.tokenSymbol} {preposition}{' '}
-                        <span className="text-[#71717A] truncate">{truncateAddress(counterparty)}</span>
-                      </p>
+                      {hasCombinedSwap ? (
+                        <>
+                          <p className="text-sm text-[#F5F3FF] truncate">Swap</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <img
+                              src={ASSET_ICON_URLS[transaction.inputSymbol ?? ''] ?? `https://cryptologos.cc/logos/${(transaction.inputSymbol ?? '').toLowerCase()}-${(transaction.inputSymbol ?? '').toLowerCase()}-logo.png`}
+                              alt=""
+                              width={14}
+                              height={14}
+                              className="h-3.5 w-3.5 rounded-full"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                            <span className="text-xs text-[#A1A1AA] truncate">{transaction.inputSymbol} → {transaction.outputSymbol}</span>
+                            <img
+                              src={ASSET_ICON_URLS[transaction.outputSymbol ?? ''] ?? `https://cryptologos.cc/logos/${(transaction.outputSymbol ?? '').toLowerCase()}-${(transaction.outputSymbol ?? '').toLowerCase()}-logo.png`}
+                              alt=""
+                              width={14}
+                              height={14}
+                              className="h-3.5 w-3.5 rounded-full"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-[#F5F3FF] truncate">
+                          {actionText} {transaction.tokenSymbol} {preposition}{' '}
+                          <span className="text-[#71717A] truncate">{truncateAddress(counterparty)}</span>
+                        </p>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`font-mono text-xs font-medium ${isIncoming ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {isIncoming ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
-                      </p>
+                      {hasCombinedSwap ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <p className="font-mono text-xs font-medium text-rose-400">-{formatDisplayBalance(transaction.inputValue ?? '0')} {transaction.inputSymbol}</p>
+                          <p className="font-mono text-xs font-medium text-emerald-400">+{formatDisplayBalance(transaction.outputValue ?? '0')} {transaction.outputSymbol}</p>
+                        </div>
+                      ) : (
+                        <p className={`font-mono text-xs font-medium ${isIncoming ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isIncoming ? '+' : '-'}{tokenDisplay} {transaction.tokenSymbol}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
