@@ -3104,7 +3104,7 @@ function App() {
                     const statusDisplay = STATUS_DISPLAY[transaction.status] ?? STATUS_DISPLAY.pending;
                     const isSwap = transaction.type === 'swap';
                     const hasCombinedSwap = isSwap && transaction.inputSymbol && transaction.outputSymbol && transaction.inputValue && transaction.outputValue;
-                    const directionIcon = isSwap ? (
+                    const directionIcon = hasCombinedSwap ? (
                       <ArrowUpDown className="h-4 w-4 text-[#C2885B]" />
                     ) : transaction.direction === 'received' ? (
                       <ArrowDownLeft className="h-4 w-4 text-emerald-500/70" />
