@@ -1132,6 +1132,7 @@ function App() {
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<string | null>(null);
   const [sendRecipientError, setSendRecipientError] = useState('');
   const [recipientResolutionStatus, setRecipientResolutionStatus] = useState<'idle' | 'checking' | 'resolved' | 'unsupported'>('idle');
+  const [showFullRecipient, setShowFullRecipient] = useState(false);
   const [sendAmountError, setSendAmountError] = useState('');
   const [requestAssetKey, setRequestAssetKey] = useState('native-usdc');
   const [requestAmount, setRequestAmount] = useState('');
@@ -3796,6 +3797,7 @@ function App() {
                 setRecipientResolutionStatus('idle');
                 setResolvedSendAddress(null);
                 setResolvedArcHandle(null);
+                setShowFullRecipient(false);
                 setScannedRequestNote('');
                 setIsResolvingArcName(false);
               }} className="text-sm text-[#A1A1AA]">Close</button>
@@ -3820,10 +3822,32 @@ function App() {
                         })()}
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
-                      <span>Recipient</span>
-                      <span className="break-all text-right text-[#F5F3FF]">{sendTarget}</span>
-                    </div>
+                    {(() => {
+                      const recipientValue = String(sendTarget ?? '');
+                      const longEnough = recipientValue.length > 14;
+                      const recipientDisplay = showFullRecipient || !longEnough
+                        ? recipientValue
+                        : `${recipientValue.slice(0, 10)}…${recipientValue.slice(-4)}`;
+                      return (
+                        <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
+                          <span>Recipient</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#F5F3FF] font-mono text-xs">
+                              {recipientDisplay}
+                            </span>
+                            {longEnough && (
+                              <button
+                                type="button"
+                                onClick={() => setShowFullRecipient((prev) => !prev)}
+                                className="text-[10px] font-medium text-[#C2885B] hover:text-[#F5F3FF] underline decoration-[#C2885B]/30"
+                              >
+                                {showFullRecipient ? 'Hide' : 'Show'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="mt-3 flex items-center justify-between text-sm text-[#A1A1AA]">
                       <span>Network Fee</span>
                       {isEstimatingGasFee ? (
@@ -3905,6 +3929,7 @@ function App() {
                             setSendAddress(e.target.value);
                             setResolvedSendAddress(null);
                             setResolvedArcHandle(null);
+                            setShowFullRecipient(false);
                             setRecipientResolutionStatus('idle');
                             setShowContactLabelInput(false);
                             setContactLabelDraft('');
