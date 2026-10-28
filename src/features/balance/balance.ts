@@ -43,6 +43,21 @@ const toBigInt = (value: unknown) => {
   return BigInt(rawValue);
 };
 
+/** Explorer payloads carry addresses either as plain strings or as objects
+ *  ({ hash } / { address_hash }). Normalize both shapes to a lowercase string. */
+const extractAddressHash = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value.toLowerCase();
+  }
+  if (isObjectRecord(value)) {
+    const hash = value.hash ?? value.address_hash;
+    if (typeof hash === 'string') {
+      return hash.toLowerCase();
+    }
+  }
+  return '';
+};
+
 export const isStableUsdPegged = (symbol?: string) => {
   const normalized = String(symbol ?? '').toUpperCase();
   return normalized === 'USDC' || normalized === 'EURC';
@@ -116,7 +131,7 @@ export const parseTransactionDirection = (walletAddress: string, from: string, t
   return 'sent';
 };
 
-export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) => {
+export const getTransactionDisplayMeta = (transaction: Record<string, unknown>, walletAddress?: string) => {
   const tokenPayload = isObjectRecord(transaction.token) ? transaction.token : null;
   const tokenTransfers = Array.isArray(transaction.token_transfers)
     ? transaction.token_transfers.filter(isObjectRecord)
@@ -169,11 +184,41 @@ export const getTransactionDisplayMeta = (transaction: Record<string, unknown>) 
     };
 
     if (usdcTransfer && eurcTransfer) {
-      // In a swap: USDC goes out (input/negative), EURC comes in (output/positive)
-      inputSymbol = 'USDC';
-      outputSymbol = 'EURC';
-      inputValue = extractValue(usdcTransfer);
-      outputValue = extractValue(eurcTransfer);
+      // Determine direction from transfer from/to: the transfer with wallet as
+      // 'from' is the input (sent), the transfer with wallet as 'to' is the
+      // output (received). This correctly handles EURC→USDC swaps.
+      const usdcFromWallet = walletAddress
+        ? extractAddressHash(usdcTransfer.from) === walletAddress.toLowerCase()
+        : false;
+      const eurcFromWallet = walletAddress
+        ? extractAddressHash(eurcTransfer.from) === walletAddress.toLowerCase()
+        : false;
+      const usdcToWallet = walletAddress
+        ? extractAddressHash(usdcTransfer.to) === walletAddress.toLowerCase()
+        : false;
+      const eurcToWallet = walletAddress
+        ? extractAddressHash(eurcTransfer.to) === walletAddress.toLowerCase()
+        : false;
+
+      if (usdcToWallet && eurcFromWallet) {
+        // EURC→USDC swap: EURC sent (from), USDC received (to)
+        inputSymbol = 'EURC';
+        outputSymbol = 'USDC';
+        inputValue = extractValue(eurcTransfer);
+        outputValue = extractValue(usdcTransfer);
+      } else if (usdcFromWallet && eurcToWallet) {
+        // USDC→EURC swap: USDC sent (from), EURC received (to)
+        inputSymbol = 'USDC';
+        outputSymbol = 'EURC';
+        inputValue = extractValue(usdcTransfer);
+        outputValue = extractValue(eurcTransfer);
+      } else {
+        // Default to USDC→EURC (legacy behavior)
+        inputSymbol = 'USDC';
+        outputSymbol = 'EURC';
+        inputValue = extractValue(usdcTransfer);
+        outputValue = extractValue(eurcTransfer);
+      }
     } else if (usdcTransfer) {
       // Only USDC transfer — treat as sent
       inputSymbol = 'USDC';

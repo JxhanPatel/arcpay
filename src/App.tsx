@@ -559,9 +559,9 @@ const groupSwapPairs = (items: TransactionHistoryItem[]): TransactionHistoryItem
 
       // Pair only if: same router AND opposite symbols (USDC vs EURC) AND opposite directions
       if (sameRouter && oppositeSymbols && oppositeDirection) {
-        // Build combined item from the pair with strict input/output selection
-        const inputItem = aSymbol === 'USDC' ? a : b;
-        const outputItem = bSymbol === 'EURC' ? b : a;
+        // Build combined item from the pair — input = sent leg, output = received leg
+        const inputItem  = a.direction === 'sent' ? a : b;
+        const outputItem = a.direction === 'received' ? a : b;
         const combined: TransactionHistoryItem = {
           hash: a.hash,
           from: a.from,
@@ -690,7 +690,7 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
           ?? (sourceItem.receiver as string | undefined)
           ?? '',
       );
-      const displayMeta = getTransactionDisplayMeta(sourceItem as Record<string, unknown>);
+      const displayMeta = getTransactionDisplayMeta(sourceItem as Record<string, unknown>, normalizedAddress);
       const status = normalizeExplorerStatus(String(sourceItem.status ?? sourceItem.tx_status ?? sourceItem.state ?? 'ok'));
       const rawTimestamp = Number(
         sourceItem.timestamp

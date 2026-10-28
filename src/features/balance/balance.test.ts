@@ -118,6 +118,123 @@ describe('getTransactionDisplayMeta', () => {
     expect(meta.decimals).toBe(6);
     expect(formatTokenBalance(meta.rawValue, meta.decimals)).toBe('0.1');
   });
+
+  it('detects EURC→USDC direction with object-shaped from/to (regression: displayed inverted as USDC→EURC)', () => {
+    const wallet = '0xFE0b5459Ef62d90B516320d7012E4E1769251321';
+    const pool = '0xb3685D16AAa000000000000000000000000000001';
+    // Mirrors the real explorer detail payload for tx 0x508ac12f…: EURC sent
+    // from the wallet, USDC received by the wallet. from/to are objects.
+    const swapTx = {
+      value: '0',
+      token: null,
+      token_transfers: [
+        {
+          total: { value: '1000000' },
+          from: { hash: wallet },
+          to: { hash: pool },
+          token: { symbol: 'EURC', decimals: '6' },
+        },
+        {
+          total: { value: '1179689' },
+          from: { hash: pool },
+          to: { hash: wallet },
+          token: { symbol: 'USDC', decimals: '6' },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(swapTx as Record<string, unknown>, wallet);
+
+    expect(meta.inputSymbol).toBe('EURC');
+    expect(meta.outputSymbol).toBe('USDC');
+    expect(meta.inputValue).toBe('1');
+    expect(meta.outputValue).toBe('1.179689');
+  });
+
+  it('detects USDC→EURC direction with object-shaped from/to', () => {
+    const wallet = '0xFE0b5459Ef62d90B516320d7012E4E1769251321';
+    const pool = '0xb3685D16AAa000000000000000000000000000001';
+    const swapTx = {
+      value: '0',
+      token: null,
+      token_transfers: [
+        {
+          total: { value: '1182064' },
+          from: { hash: wallet },
+          to: { hash: pool },
+          token: { symbol: 'USDC', decimals: '6' },
+        },
+        {
+          total: { value: '1000000' },
+          from: { hash: pool },
+          to: { hash: wallet },
+          token: { symbol: 'EURC', decimals: '6' },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(swapTx as Record<string, unknown>, wallet);
+
+    expect(meta.inputSymbol).toBe('USDC');
+    expect(meta.outputSymbol).toBe('EURC');
+    expect(meta.inputValue).toBe('1.182064');
+    expect(meta.outputValue).toBe('1');
+  });
+
+  it('detects swap direction with plain-string from/to addresses', () => {
+    const wallet = '0xfe0b5459ef62d90b516320d7012e4e1769251321';
+    const pool = '0xb3685d16aaa00000000000000000000000000001';
+    const swapTx = {
+      value: '0',
+      token: null,
+      token_transfers: [
+        {
+          total: { value: '1000000' },
+          from: wallet,
+          to: pool,
+          token: { symbol: 'EURC', decimals: '6' },
+        },
+        {
+          total: { value: '1179689' },
+          from: pool,
+          to: wallet,
+          token: { symbol: 'USDC', decimals: '6' },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(swapTx as Record<string, unknown>, wallet);
+
+    expect(meta.inputSymbol).toBe('EURC');
+    expect(meta.outputSymbol).toBe('USDC');
+    expect(meta.inputValue).toBe('1');
+    expect(meta.outputValue).toBe('1.179689');
+  });
+
+  it('falls back to the legacy USDC→EURC default when transfer addresses are absent', () => {
+    const wallet = '0xFE0b5459Ef62d90B516320d7012E4E1769251321';
+    const swapTx = {
+      value: '0',
+      token: null,
+      token_transfers: [
+        {
+          total: { value: '1179689' },
+          token: { symbol: 'USDC', decimals: '6' },
+        },
+        {
+          total: { value: '1000000' },
+          token: { symbol: 'EURC', decimals: '6' },
+        },
+      ],
+    };
+
+    const meta = getTransactionDisplayMeta(swapTx as Record<string, unknown>, wallet);
+
+    expect(meta.inputSymbol).toBe('USDC');
+    expect(meta.outputSymbol).toBe('EURC');
+    expect(meta.inputValue).toBe('1.179689');
+    expect(meta.outputValue).toBe('1');
+  });
 });
 
 describe('buildRequestLink', () => {
