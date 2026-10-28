@@ -618,6 +618,25 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
           ? (payload as { result?: unknown[] }).result ?? []
           : [];
 
+  // Function selector for ERC-20 approve(address,uint256) = 0x095ea7b3
+  const APPROVE_SELECTOR = '0x095ea7b3';
+  // Specific approve transaction hash to hide (from user request)
+  const HIDDEN_APPROVE_HASH = '0xd5d81a6ee9cbc8e2fc1ddc5ee6f2c2ff3e88045831815fd66824d79796e4d9c9';
+
+  // Check if a raw explorer item represents an approve transaction
+  const isApproveTransaction = (rawItem: Record<string, unknown>): boolean => {
+    // Check by explicit method name
+    if (rawItem.method && String(rawItem.method).toLowerCase() === 'approve') {
+      return true;
+    }
+    // Check by function selector in raw_input / data
+    const rawInput = String(rawItem.raw_input ?? rawItem.data ?? '');
+    if (rawInput.toLowerCase().startsWith(APPROVE_SELECTOR)) {
+      return true;
+    }
+    return false;
+  };
+
   const normalizedCandidates = await Promise.all(
     candidates.map(async (item): Promise<TransactionHistoryItem | null> => {
       if (!isPlainObject(item)) {
@@ -625,6 +644,17 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
       }
 
       const hash = String(item.hash ?? item.transaction_hash ?? item.tx_hash ?? '');
+      
+      // Skip the specific hidden approve transaction hash
+      if (hash.toLowerCase() === HIDDEN_APPROVE_HASH.toLowerCase()) {
+        return null;
+      }
+      
+      // Skip approve transactions (ERC-20 approval calls)
+      if (isApproveTransaction(item)) {
+        return null;
+      }
+
       const transactionTypes = Array.isArray(item.transaction_types)
         ? item.transaction_types.map((entry) => String(entry ?? '').toLowerCase())
         : [];
@@ -638,6 +668,10 @@ export const fetchTransactionHistory = async (address: string): Promise<Transact
         ? await fetchTransactionDetail(hash)
         : null;
       const sourceItem = detailItem && isPlainObject(detailItem) ? detailItem : item;
+      // Skip if detailed source reveals an approve transaction
+      if (isApproveTransaction(sourceItem)) {
+        return null;
+      }
       const sourceTokenTransfers = Array.isArray(sourceItem.token_transfers)
         ? sourceItem.token_transfers.filter(isObjectRecord)
         : [];
